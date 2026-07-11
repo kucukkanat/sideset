@@ -1,0 +1,21 @@
+{
+  "name": "@keychain/app",
+  "version": "0.1.0",
+  "description": "Keychain — identity wallet app (React, served and bundled by Bun)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun index.html",
+    "build": "bun build index.html --outdir dist --minify"
+  },
+  "dependencies": {
+    "@keychain/core": "workspace:*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0"
+  }
+}

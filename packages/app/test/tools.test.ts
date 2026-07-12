@@ -17,10 +17,32 @@ describe("Nostr content tools", () => {
   test("encrypts for a recipient and lets either participant decrypt", () => {
     const sender = generateNostrIdentity();
     const recipient = generateNostrIdentity();
-    const encrypted = encryptForRecipient(textBytes("private hello"), sender, recipient.publicKey);
+    const encrypted = encryptForRecipient(
+      textBytes("private hello"),
+      sender,
+      nip19.npubEncode(recipient.publicKey),
+    );
+    expect(JSON.parse(encrypted)).toMatchObject({
+      sender: nip19.npubEncode(sender.publicKey),
+      recipient: nip19.npubEncode(recipient.publicKey),
+    });
     expect(bytesText(decryptFromRecipient(encrypted, recipient))).toBe("private hello");
     expect(bytesText(decryptFromRecipient(encrypted, sender))).toBe("private hello");
     expect(() => decryptFromRecipient(encrypted, generateNostrIdentity())).toThrow();
+  });
+
+  test("decrypts legacy envelopes containing hex public keys", () => {
+    const sender = generateNostrIdentity();
+    const recipient = generateNostrIdentity();
+    const encrypted = JSON.parse(
+      encryptForRecipient(textBytes("legacy hello"), sender, recipient.publicKey),
+    ) as Record<string, unknown>;
+    const legacy = JSON.stringify({
+      ...encrypted,
+      sender: sender.publicKey,
+      recipient: recipient.publicKey,
+    });
+    expect(bytesText(decryptFromRecipient(legacy, recipient))).toBe("legacy hello");
   });
 
   test("rejects non-Nostr and mismatched identities", () => {

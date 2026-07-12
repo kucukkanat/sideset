@@ -74,31 +74,32 @@ export const encryptForRecipient = (
   identity: IdentityKeyPair,
   recipient: string,
 ): string => {
-  if (!HEX.test(recipient))
-    throw new TypeError("Recipient must be a 64-character lowercase hex Nostr public key");
-  const key = nip44.v2.utils.getConversationKey(validateIdentity(identity), recipient);
+  const recipientHex = nostrPublicKeyHex(recipient);
+  if (recipientHex === null) throw new TypeError("Recipient must be a valid Nostr public key");
+  const sender = nostrPublicKey(identity.publicKey);
+  const encodedRecipient = nostrPublicKey(recipientHex);
+  if (sender === null || encodedRecipient === null)
+    throw new TypeError("The active identity is not a valid Nostr keypair");
+  const key = nip44.v2.utils.getConversationKey(validateIdentity(identity), recipientHex);
   return JSON.stringify({
     v: 1,
     mode: "nip44",
-    sender: identity.publicKey,
-    recipient,
+    sender,
+    recipient: encodedRecipient,
     payload: nip44.v2.encrypt(b64(data), key),
   } satisfies RecipientEnvelope);
 };
 
 export const decryptFromRecipient = (value: string, identity: IdentityKeyPair): Uint8Array => {
   const envelope = JSON.parse(value) as RecipientEnvelope;
-  if (
-    envelope.v !== 1 ||
-    envelope.mode !== "nip44" ||
-    !HEX.test(envelope.sender) ||
-    !HEX.test(envelope.recipient)
-  )
+  const sender = nostrPublicKeyHex(envelope.sender);
+  const recipient = nostrPublicKeyHex(envelope.recipient);
+  if (envelope.v !== 1 || envelope.mode !== "nip44" || sender === null || recipient === null)
     throw new Error("Invalid NIP-44 envelope");
   const secret = validateIdentity(identity);
-  if (envelope.sender !== identity.publicKey && envelope.recipient !== identity.publicKey)
+  if (sender !== identity.publicKey && recipient !== identity.publicKey)
     throw new Error("The active identity is not a participant in this envelope");
-  const peer = envelope.sender === identity.publicKey ? envelope.recipient : envelope.sender;
+  const peer = sender === identity.publicKey ? recipient : sender;
   return unb64(nip44.v2.decrypt(envelope.payload, nip44.v2.utils.getConversationKey(secret, peer)));
 };
 

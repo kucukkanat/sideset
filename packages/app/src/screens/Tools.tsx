@@ -132,11 +132,7 @@ export const Tools = ({
         setOutput(
           symmetric
             ? await encryptWithPassphrase(data, passphrase)
-            : (() => {
-                const publicKey = nostrPublicKeyHex(recipient);
-                if (publicKey === null) throw new TypeError("Expected a valid npub public key");
-                return encryptForRecipient(data, identity, publicKey);
-              })(),
+            : encryptForRecipient(data, identity, recipient),
         );
       if (operation === "decrypt") {
         const envelope = file === null ? source : bytesText(data);

@@ -50,7 +50,6 @@ export const ShareSheet = ({
         flexDirection: "column",
         alignItems: "center",
         textAlign: "center",
-        animation: "riseIn .4s ease",
       }}
     >
       <div className="sheet-title">Share {subject.name}</div>

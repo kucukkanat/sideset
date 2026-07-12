@@ -30,7 +30,7 @@ export const Sheet = ({
         sheet?.querySelector<HTMLElement>("[autofocus]") ??
         sheet?.querySelector<HTMLElement>("input:not([disabled]),textarea:not([disabled])") ??
         sheet?.querySelector<HTMLElement>("button:not([disabled]),a[href]");
-      preferred?.focus();
+      preferred?.focus({ preventScroll: true });
     });
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
@@ -47,17 +47,17 @@ export const Sheet = ({
       if (first === undefined || last === undefined) return;
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
-        last.focus();
+        last.focus({ preventScroll: true });
       } else if (!event.shiftKey && document.activeElement === last) {
         event.preventDefault();
-        first.focus();
+        first.focus({ preventScroll: true });
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
       cancelAnimationFrame(focusFrame);
       window.removeEventListener("keydown", onKeyDown);
-      if (previous?.isConnected) previous.focus();
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
   }, [onClose]);
 

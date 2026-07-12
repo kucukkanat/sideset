@@ -1073,11 +1073,24 @@ describe("honest client-only wallet", () => {
     if (contact === undefined) throw new Error("Test wallet needs a contact");
     await mount(`#/people/${contact.id}`);
 
-    await click(byTestId("contact-detail-share-action"));
+    const focusCalls: (FocusOptions | undefined)[] = [];
+    const originalFocus = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function (options?: FocusOptions): void {
+      focusCalls.push(options);
+      originalFocus.call(this, options);
+    };
+    try {
+      await click(byTestId("contact-detail-share-action"));
+    } finally {
+      HTMLElement.prototype.focus = originalFocus;
+    }
     expect(window.location.hash).toBe(`#/people/${contact.id}?sheet=share`);
     expect(maybeByTestId("share-sheet")).toBeDefined();
     expect(maybeByText(`Share ${contact.name}`)).toBeDefined();
     expect(document.querySelector('svg[aria-label="Scannable profile code"]')).not.toBeNull();
+    expect(byTestId("sheet").style.animation).toContain("sheetUp");
+    expect(byTestId("share-sheet").style.animation).toBe("");
+    expect(focusCalls).toContainEqual({ preventScroll: true });
 
     await click(byTestId("share-copy-link"));
     const token = sharedProfileTokenFromInput(

@@ -6,8 +6,6 @@ const appDir = fileURLToPath(new URL("../", import.meta.url));
 const distDir = join(appDir, "dist");
 const staticAssets = [
   "manifest.webmanifest",
-  "assets/brand/sideset-logo-light.png",
-  "assets/brand/sideset-logo-dark.png",
   "assets/brand/sideset-mark.png",
   "icons/favicon-32.png",
   "icons/icon-192.png",

@@ -2,6 +2,7 @@ import type { Card, IdentityKeyPair } from "@keychain/core";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { nip44 } from "nostr-tools";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
+import { nostrPublicKey, nostrPublicKeyHex } from "./nostrKeys.ts";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder(undefined, { fatal: true });
@@ -169,7 +170,7 @@ export const signText = async (text: string, card: Card): Promise<string> => {
     ...(card.email ? { email: card.email } : {}),
     avatar: card.avatar,
     bio: card.bio,
-    publicKey: identity.publicKey,
+    publicKey: nostrPublicKey(identity.publicKey) ?? identity.publicKey,
   };
   const payload = signedPayload(profile, text);
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", buffer(textBytes(payload))));
@@ -198,7 +199,7 @@ export const verifySignedText = async (signedValue: string): Promise<SignedTextV
       typeof fields.avatar !== "string" ||
       typeof fields.bio !== "string" ||
       typeof fields.publicKey !== "string" ||
-      !HEX.test(fields.publicKey)
+      nostrPublicKeyHex(fields.publicKey) === null
     )
       return { ok: false };
     const verifiedProfile: SignedProfile = {
@@ -219,9 +220,11 @@ export const verifySignedText = async (signedValue: string): Promise<SignedTextV
     const signatureBytes = Uint8Array.from(signature.match(/../gu) ?? [], (pair) =>
       Number.parseInt(pair, 16),
     );
+    const publicKey = nostrPublicKeyHex(verifiedProfile.publicKey);
+    if (publicKey === null) return { ok: false };
     return {
       ok: true,
-      valid: schnorr.verify(signatureBytes, digest, bytes(verifiedProfile.publicKey)),
+      valid: schnorr.verify(signatureBytes, digest, bytes(publicKey)),
       profile: verifiedProfile,
       text,
     };

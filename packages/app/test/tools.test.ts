@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Card } from "@keychain/core";
+import { nip19 } from "nostr-tools";
 import {
   bytesText,
   decryptFromRecipient,
@@ -74,7 +75,7 @@ describe("Nostr content tools", () => {
         email: "ada@example.com",
         avatar: "🧑",
         bio: "Builder",
-        publicKey: identity.publicKey,
+        publicKey: nip19.npubEncode(identity.publicKey),
       },
       text: "signed",
     });

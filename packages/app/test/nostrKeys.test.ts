@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { nip19 } from "nostr-tools";
-import { nostrDisplayKeys } from "../src/nostrKeys.ts";
+import { nostrDisplayKeys, nostrPublicKey, nostrPublicKeyHex } from "../src/nostrKeys.ts";
 import { generateNostrIdentity } from "../src/tools.ts";
 
 const hex = (bytes: Uint8Array): string =>
@@ -23,5 +23,15 @@ describe("Nostr display keys", () => {
 
   test("rejects malformed internal key material", () => {
     expect(() => nostrDisplayKeys({ publicKey: "invalid", privateKey: "invalid" })).toThrow();
+  });
+
+  test("normalizes public keys at the UI and cryptography boundaries", () => {
+    const identity = generateNostrIdentity();
+    const npub = nip19.npubEncode(identity.publicKey);
+
+    expect(nostrPublicKey(identity.publicKey)).toBe(npub);
+    expect(nostrPublicKey(npub)).toBe(npub);
+    expect(nostrPublicKeyHex(npub)).toBe(identity.publicKey);
+    expect(nostrPublicKeyHex("not-a-key")).toBeNull();
   });
 });

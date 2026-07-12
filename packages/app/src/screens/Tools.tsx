@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { type ChangeEvent, type ReactElement, useMemo, useState } from "react";
 import { CloakTool } from "../components/CloakTool.tsx";
+import { nostrPublicKey, nostrPublicKeyHex } from "../nostrKeys.ts";
 import type { ToolOperation } from "../routing.ts";
 import { copyText } from "../sharing.ts";
 import {
@@ -37,8 +38,6 @@ const OPERATION_ICONS: Readonly<Record<ToolOperation, LucideIcon>> = {
   cloak: VenetianMask,
 };
 
-const NOSTR_PUBLIC_KEY = /^[0-9a-f]{64}$/;
-
 interface RecipientOption {
   readonly id: string;
   readonly name: string;
@@ -54,16 +53,21 @@ const recipientOptions = (
   query: string,
 ): readonly RecipientOption[] => {
   const options: readonly RecipientOption[] = [
-    ...contacts
-      .filter((contact) => NOSTR_PUBLIC_KEY.test(contact.npub))
-      .map((contact) => ({
-        id: `contact-${contact.id}`,
-        name: contact.name,
-        handle: contact.handle,
-        avatar: contact.avatar,
-        publicKey: contact.npub,
-        kind: "Contact" as const,
-      })),
+    ...contacts.flatMap((contact) => {
+      const publicKey = nostrPublicKeyHex(contact.npub);
+      return publicKey === null
+        ? []
+        : [
+            {
+              id: `contact-${contact.id}`,
+              name: contact.name,
+              handle: contact.handle,
+              avatar: contact.avatar,
+              publicKey: nostrPublicKey(publicKey) ?? "",
+              kind: "Contact" as const,
+            },
+          ];
+    }),
     ...cards.flatMap((card) =>
       card.identity === undefined
         ? []
@@ -73,7 +77,7 @@ const recipientOptions = (
               name: card.name,
               handle: card.handle,
               avatar: card.avatar,
-              publicKey: card.identity.publicKey,
+              publicKey: nostrPublicKey(card.identity.publicKey) ?? "",
               kind: "Your card" as const,
             },
           ],
@@ -128,7 +132,11 @@ export const Tools = ({
         setOutput(
           symmetric
             ? await encryptWithPassphrase(data, passphrase)
-            : encryptForRecipient(data, identity, recipient.trim()),
+            : (() => {
+                const publicKey = nostrPublicKeyHex(recipient);
+                if (publicKey === null) throw new TypeError("Expected a valid npub public key");
+                return encryptForRecipient(data, identity, publicKey);
+              })(),
         );
       if (operation === "decrypt") {
         const envelope = file === null ? source : bytesText(data);
@@ -254,7 +262,7 @@ export const Tools = ({
                   }}
                   onFocus={() => setRecipientFocused(true)}
                   onBlur={() => setRecipientFocused(false)}
-                  placeholder="64-character hex key"
+                  placeholder="npub1…"
                   spellCheck={false}
                   autoComplete="off"
                   role="combobox"
@@ -414,7 +422,9 @@ export const Tools = ({
                 <div className="tools-field-label">Signed text</div>
                 <div data-testid="tools-verified-text">{verification.text}</div>
               </div>
-              <div className="tools-signer-key tools-mono">{verification.profile.publicKey}</div>
+              <div className="tools-signer-key tools-mono">
+                {nostrPublicKey(verification.profile.publicKey)}
+              </div>
             </div>
           ) : (
             <div

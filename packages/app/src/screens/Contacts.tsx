@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { CardAvatar } from "../components/CardAvatar.tsx";
 import { ChevronIcon, PlusIcon, SearchIcon, TrashIcon } from "../icons.tsx";
 
 interface ContactsProps {
@@ -259,7 +260,11 @@ export const Contacts = ({
                         style={{ background: palette.grad }}
                         aria-hidden="true"
                       >
-                        {contact.avatar}
+                        <CardAvatar
+                          card={contact}
+                          seed={contact.npub || contact.id}
+                          style={{ width: "100%", height: "100%" }}
+                        />
                       </span>
                       <span className="contact-row-copy">
                         <strong>{contact.name}</strong>
@@ -287,7 +292,11 @@ export const Contacts = ({
                         style={{ background: palette.grad }}
                         aria-hidden="true"
                       >
-                        {contact.avatar}
+                        <CardAvatar
+                          card={contact}
+                          seed={contact.npub || contact.id}
+                          style={{ width: "100%", height: "100%" }}
+                        />
                       </span>
                       <span className="contact-row-copy">
                         <strong>{contact.name}</strong>

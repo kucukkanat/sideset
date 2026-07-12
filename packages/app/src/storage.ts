@@ -30,6 +30,12 @@ export interface WalletSnapshotV1 extends WalletState {
   readonly version: 1;
 }
 
+export interface WalletBackupV2 {
+  readonly version: 2;
+  readonly included: { readonly settings: boolean; readonly contacts: boolean };
+  readonly state: WalletSnapshotV1;
+}
+
 export type SnapshotResult =
   | { readonly ok: true; readonly state: WalletState }
   | { readonly ok: false; readonly reason: "invalid" | "unsupported" };
@@ -93,7 +99,7 @@ const isContact = (value: unknown): value is Contact =>
   isText(value.name, 80, false) &&
   isText(value.handle, 81, false) &&
   value.handle.startsWith("@") &&
-  isText(value.avatar, 16, false) &&
+  isAvatar(value.avatar) &&
   typeof value.color === "number" &&
   Number.isInteger(value.color) &&
   typeof value.mutuals === "number" &&
@@ -141,6 +147,62 @@ export const createInitialWalletState = (_now = Date.now()): WalletState => ({
 });
 
 export const walletSnapshot = (state: WalletState): WalletSnapshotV1 => ({ version: 1, ...state });
+
+export const walletBackup = (
+  state: WalletState,
+  selection: {
+    readonly cardIds: readonly string[];
+    readonly settings: boolean;
+    readonly contacts: boolean;
+  },
+): WalletBackupV2 => {
+  const cards = state.cards.filter(({ id }) => selection.cardIds.includes(id));
+  return {
+    version: 2,
+    included: { settings: selection.settings, contacts: selection.contacts },
+    state: walletSnapshot({
+      cards,
+      contacts: selection.contacts ? state.contacts : [],
+      activeId: cards.some(({ id }) => id === state.activeId)
+        ? state.activeId
+        : (cards[0]?.id ?? ""),
+      theme: selection.settings ? state.theme : "system",
+      activity: selection.settings ? state.activity : [],
+    }),
+  };
+};
+
+export type BackupDecodeResult =
+  | {
+      readonly ok: true;
+      readonly state: WalletState;
+      readonly included: { readonly settings: boolean; readonly contacts: boolean };
+    }
+  | { readonly ok: false; readonly reason: "invalid" | "unsupported" };
+
+export const decodeWalletBackup = (value: unknown): BackupDecodeResult => {
+  if (isRecord(value) && value.version === 2) {
+    if (
+      !isRecord(value.included) ||
+      typeof value.included.settings !== "boolean" ||
+      typeof value.included.contacts !== "boolean"
+    ) {
+      return { ok: false, reason: "invalid" };
+    }
+    const decoded = decodeWalletSnapshot(value.state);
+    return decoded.ok
+      ? {
+          ok: true,
+          state: decoded.state,
+          included: { settings: value.included.settings, contacts: value.included.contacts },
+        }
+      : decoded;
+  }
+  const decoded = decodeWalletSnapshot(value);
+  return decoded.ok
+    ? { ok: true, state: decoded.state, included: { settings: true, contacts: true } }
+    : decoded;
+};
 
 export const decodeWalletSnapshot = (value: unknown): SnapshotResult => {
   if (!isRecord(value)) return { ok: false, reason: "invalid" };

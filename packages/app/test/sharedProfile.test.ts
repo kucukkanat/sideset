@@ -4,6 +4,7 @@ import {
   createGithubVerificationCode,
   generateIdentityKeyPair,
 } from "../src/accountVerification.ts";
+import { nostrPublicKey } from "../src/nostrKeys.ts";
 import {
   decodeSharedProfile,
   encodeSharedProfile,
@@ -131,12 +132,35 @@ describe("shared profile encoding", () => {
       { ...base, name: "n".repeat(81) },
       { ...base, handle: "h".repeat(81) },
       { ...base, handle: "@" },
-      { ...base, avatar: "" },
       { ...base, avatar: "a".repeat(17) },
       { ...base, bio: "b".repeat(281) },
     ]) {
       expect(decodeSharedProfile(encodeJson(value))).toEqual({ ok: false, reason: "invalid" });
     }
+  });
+
+  test("accepts an empty avatar as the generated-avatar sentinel", () => {
+    const encoded = encodeSharedProfile({
+      id: "generated-avatar",
+      name: "GF",
+      handle: "Gilfoyle",
+      avatar: "",
+      color: 0,
+      bio: "",
+    });
+
+    expect(decodeSharedProfile(encoded)).toEqual({
+      ok: true,
+      profile: {
+        version: 1,
+        sourceId: "generated-avatar",
+        name: "GF",
+        handle: "Gilfoyle",
+        avatar: "",
+        color: 0,
+        bio: "",
+      },
+    });
   });
 });
 
@@ -149,7 +173,7 @@ describe("shared profile contacts", () => {
       sourceId: publicKey,
       publicKey,
       name: "Ada Key",
-      handle: "aaaaaaaa…aaaaaa",
+      handle: `${nostrPublicKey(publicKey)?.slice(0, 12)}…`,
       avatar: "🔑",
       color: 3,
       bio: "",
@@ -167,6 +191,18 @@ describe("shared profile contacts", () => {
     }
     expect(sharedProfileFromPublicKey(publicKey, " ")).toBeNull();
     expect(sharedProfileFromPublicKey(publicKey, "A".repeat(81))).toBeNull();
+  });
+
+  test("accepts an npub and normalizes it to its hex public key", () => {
+    const npub = "npub1mlp5mcn6st4g45zp8t3ulm47qkj059q0gegq4dxp5gthu6gwj89shuc5h7";
+
+    expect(parseEd25519PublicKey(npub)).toBe(
+      "dfc34de27a82ea8ad0413ae3cfeebe05a4fa140f46500ab4c1a2177e690e91cb",
+    );
+    expect(sharedProfileFromPublicKey(npub, "Valid npub")).toMatchObject({
+      publicKey: "dfc34de27a82ea8ad0413ae3cfeebe05a4fa140f46500ab4c1a2177e690e91cb",
+      name: "Valid npub",
+    });
   });
 
   test("preserves and verifies signed provider connections with the shared public key", async () => {
@@ -255,7 +291,7 @@ describe("shared profile contacts", () => {
     if (!decoded.ok) throw new Error("Expected the contact profile to decode");
 
     expect(decoded.profile.identityId).toBe("internal-public-identity");
-    expect(sharedProfileToContact(decoded.profile).npub).toBe("internal-public-identity");
+    expect(sharedProfileToContact(decoded.profile).npub).toBe("");
   });
 
   test("every accepted maximum-length handle converts into persistable contact state", () => {

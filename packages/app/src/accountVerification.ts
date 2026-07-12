@@ -1,5 +1,6 @@
 import type { Card, IdentityKeyPair, ProviderId } from "@keychain/core";
-import { finalizeEvent, type NostrEvent, verifyEvent } from "nostr-tools/pure";
+import { nip19 } from "nostr-tools";
+import { finalizeEvent, getPublicKey, type NostrEvent, verifyEvent } from "nostr-tools/pure";
 import { generateNostrIdentity } from "./tools.ts";
 
 export type GithubProfile = {
@@ -71,6 +72,22 @@ const proofMessage = (
 
 export const generateIdentityKeyPair = async (): Promise<IdentityKeyPair> => {
   return generateNostrIdentity();
+};
+
+const toHex = (value: Uint8Array): string =>
+  Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("");
+
+/** Accept the portable Nostr secret-key format, then derive the matching public key. */
+export const identityFromPrivateKey = (value: string): IdentityKeyPair | null => {
+  const normalized = value.trim();
+  try {
+    const decoded = nip19.decode(normalized);
+    if (decoded.type !== "nsec") return null;
+    const secret = decoded.data;
+    return { privateKey: toHex(secret), publicKey: getPublicKey(secret) };
+  } catch {
+    return null;
+  }
 };
 
 export const createGithubVerificationCode = async (

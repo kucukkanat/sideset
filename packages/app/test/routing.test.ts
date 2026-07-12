@@ -42,6 +42,10 @@ const CASES: readonly { readonly route: Route; readonly hash: string }[] = [
     route: { page: "person", contactId: "person / λ", sheet: "edit" },
     hash: "#/people/person%20%2F%20%CE%BB?sheet=edit",
   },
+  {
+    route: { page: "person", contactId: "person / λ", sheet: "share" },
+    hash: "#/people/person%20%2F%20%CE%BB?sheet=share",
+  },
   { route: { page: "activity" }, hash: "#/activity" },
   { route: { page: "tools", operation: "encrypt" }, hash: "#/tools/encrypt" },
   { route: { page: "tools", operation: "decrypt" }, hash: "#/tools/decrypt" },
@@ -81,6 +85,7 @@ describe("hash route parsing and formatting", () => {
       "#/wallet?card=c1&card=c2",
       "#/wallet?sheet=edit",
       "#/cards/c1?sheet=create",
+      "#/cards/c1?sheet=backup",
       "#/people?sheet=edit",
       "#/people?sheet=add&profile=not+padded",
       "#/people?sheet=add&profile=a&profile=b",

@@ -280,7 +280,7 @@ describe("honest client-only wallet", () => {
     expect((byTestId("card-generated-avatar") as HTMLImageElement).src).not.toBe(firstAvatar);
   });
 
-  test("offers only random generation and image upload avatar actions", async () => {
+  test("offers generated and imported identity choices", async () => {
     localStorage.clear();
     await mount();
 
@@ -289,6 +289,29 @@ describe("honest client-only wallet", () => {
     expect(avatarUpload.parentElement?.style.color).toBe("var(--kc-text)");
     expect(avatarUpload.parentElement?.style.background).toBe("var(--kc-surface-raised)");
     expect(document.querySelectorAll('[data-testid^="create-card-avatar-"]').length).toBe(2);
+    expect(byTestId("create-card-import-identity")).toBeDefined();
+  });
+
+  test("creates a card from a user-provided Nostr private key", async () => {
+    localStorage.clear();
+    const imported = await generateIdentityKeyPair();
+    await mount();
+    await click(byTestId("create-card-import-identity"));
+    await type(byTestId("create-card-private-key") as HTMLInputElement, "invalid");
+    expect(byTestId("create-card-private-key-error")).toBeDefined();
+    await type(
+      byTestId("create-card-private-key") as HTMLInputElement,
+      nip19.nsecEncode(
+        Uint8Array.from(imported.privateKey.match(/../gu) ?? [], (pair) =>
+          Number.parseInt(pair, 16),
+        ),
+      ),
+    );
+    await type(byTestId("create-card-name") as HTMLInputElement, "Imported");
+    await click(byTestId("create-card-submit"));
+    await act(async () => void (await tick(700)));
+
+    expect(loadWalletState().state.cards[0]?.identity).toEqual(imported);
   });
 
   test("previews an uploaded avatar image", async () => {
@@ -451,12 +474,12 @@ describe("honest client-only wallet", () => {
     expect(maybeByTestId("tools-recipient-option-contact-p1")).toBeDefined();
     expect(maybeByTestId("tools-recipient-option-card-c1")).toBeUndefined();
     await click(byTestId("tools-recipient-option-contact-p1"));
-    expect(input.value).toBe(contactPublicKey);
+    expect(input.value).toBe(nip19.npubEncode(contactPublicKey));
 
     await act(async () => input.focus());
     await type(input, "Everyday");
     await click(byTestId("tools-recipient-option-card-c1"));
-    expect(input.value).toBe(cardPublicKey);
+    expect(input.value).toBe(nip19.npubEncode(cardPublicKey));
   });
 
   test("cloaks, copies, and reveals a password-protected message", async () => {
@@ -532,7 +555,7 @@ describe("honest client-only wallet", () => {
     expect(JSON.parse(signature)).toMatchObject({
       version: 1,
       text: "verify me",
-      profile: { publicKey: identity.publicKey },
+      profile: { publicKey: nip19.npubEncode(identity.publicKey) },
     });
 
     await click(byTestId("tools-operation-verify"));
@@ -823,6 +846,41 @@ describe("honest client-only wallet", () => {
     expect(bodyText()).not.toMatch(/\bnostr\b|\brelay\b/iu);
   });
 
+  test("seeds default contact avatars from their public keys", async () => {
+    const initial = createTestWalletState();
+    const contact = initial.contacts[0];
+    if (contact === undefined) throw new Error("Missing seeded contact");
+    expect(
+      saveWalletState({
+        ...initial,
+        contacts: [{ ...contact, avatar: "", npub: "a".repeat(64) }, ...initial.contacts.slice(1)],
+      }),
+    ).toEqual({ ok: true });
+
+    await mount("#/people");
+    const listAvatar = byTestId("card-generated-avatar") as HTMLImageElement;
+    const publicKeyAvatar = listAvatar.src;
+
+    expect(
+      saveWalletState({
+        ...initial,
+        contacts: [{ ...contact, avatar: "", npub: "b".repeat(64) }, ...initial.contacts.slice(1)],
+      }),
+    ).toEqual({ ok: true });
+    await mount("#/people");
+    expect((byTestId("card-generated-avatar") as HTMLImageElement).src).not.toBe(publicKeyAvatar);
+
+    expect(
+      saveWalletState({
+        ...initial,
+        contacts: [{ ...contact, avatar: "", npub: "a".repeat(64) }, ...initial.contacts.slice(1)],
+      }),
+    ).toEqual({ ok: true });
+    await mount(`#/people/${contact.id}`);
+    const detailAvatar = byTestId("card-generated-avatar") as HTMLImageElement;
+    expect(detailAvatar.src).toBe(publicKeyAvatar);
+  });
+
   test("searches contacts and preserves the query across detail navigation", async () => {
     await mount("#/people");
 
@@ -1010,6 +1068,29 @@ describe("honest client-only wallet", () => {
     expect(window.location.hash).toBe("#/cards/c1");
   });
 
+  test("shares a contact through the same share sheet", async () => {
+    const contact = createTestWalletState().contacts[0];
+    if (contact === undefined) throw new Error("Test wallet needs a contact");
+    await mount(`#/people/${contact.id}`);
+
+    await click(byTestId("contact-detail-share-action"));
+    expect(window.location.hash).toBe(`#/people/${contact.id}?sheet=share`);
+    expect(maybeByTestId("share-sheet")).toBeDefined();
+    expect(maybeByText(`Share ${contact.name}`)).toBeDefined();
+    expect(document.querySelector('svg[aria-label="Scannable profile code"]')).not.toBeNull();
+
+    await click(byTestId("share-copy-link"));
+    const token = sharedProfileTokenFromInput(
+      await navigator.clipboard.readText(),
+      window.location.href,
+    );
+    if (token === null) throw new Error("Copied contact link did not contain a profile token");
+    const decoded = decodeSharedProfile(token);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) throw new Error("Copied contact profile was invalid");
+    expect(decoded.profile).toMatchObject({ name: contact.name, handle: contact.handle });
+  });
+
   test("confirms and persists an application reset from settings", async () => {
     const initial = createTestWalletState();
     const firstCard = initial.cards[0];
@@ -1101,7 +1182,7 @@ describe("honest client-only wallet", () => {
     if (fileInput === null || passwordInput === null) throw new Error("Missing restore fields");
     await upload(fileInput, file);
     await type(passwordInput, "Wrong password");
-    await click(buttonContaining("Restore backup"));
+    await click(buttonContaining("Continue"));
     await waitFor(
       () => bodyText().includes("Wrong password, or the backup is damaged"),
       "Wrong-password error did not appear",
@@ -1109,7 +1190,12 @@ describe("honest client-only wallet", () => {
     expect(window.location.hash).toBe("#/settings?sheet=restore");
 
     await type(passwordInput, password);
-    await click(buttonContaining("Restore backup"));
+    await click(buttonContaining("Continue"));
+    await waitFor(
+      () => maybeByText("Choose what to import") !== undefined,
+      "Backup contents were not shown",
+    );
+    await click(buttonContaining("Import selected"));
     await waitFor(() => maybeByText("Backup restored") !== undefined, "Backup was not restored");
 
     const saved = loadWalletState();
@@ -1170,16 +1256,45 @@ describe("honest client-only wallet", () => {
     expect(maybeByText("Connected accounts")).toBeUndefined();
   });
 
+  test("prioritizes a shared contact over first-card onboarding", async () => {
+    const encoded = encodeSharedProfile({
+      id: "shared-before-onboarding",
+      name: "Nova Lane",
+      handle: "nova",
+      avatar: "",
+      color: 2,
+      bio: "Making small, useful things.",
+      identity: {
+        publicKey: "a828c6fa1e85bcbf6a41c443965d4646eadce9675d2f12ec2a9fab7ed1e4e241",
+        privateKey: "b".repeat(64),
+      },
+    });
+    expect(saveWalletState(createInitialWalletState())).toEqual({ ok: true });
+
+    await mount(`#/people?sheet=add&profile=${encoded}`);
+
+    expect(maybeByTestId("add-contact-preview-card")).toBeDefined();
+    expect(maybeByText("Nova Lane")).toBeDefined();
+    expect(maybeByText("Create a card")).toBeUndefined();
+    await clickText("Add contact");
+
+    expect(window.location.hash).toMatch(/^#\/people\/p-[a-z0-9]+$/u);
+    expect(loadWalletState().state.contacts).toHaveLength(1);
+
+    const contactRoute = window.location.hash;
+    await mount(contactRoute);
+    expect(maybeByText("Nova Lane")).toBeDefined();
+    expect(loadWalletState().state.contacts).toHaveLength(1);
+  });
+
   test("adds a contact by public key and rejects the same key twice", async () => {
     const identity = await generateIdentityKeyPair();
+    const npub = nip19.npubEncode(identity.publicKey);
     const initialContactCount = createTestWalletState().contacts.length;
     await mount("#/people?sheet=add");
 
     expect(maybeByText("Profile link or public key")).toBeDefined();
-    await type(
-      byTestId("add-contact-profile-link") as HTMLInputElement,
-      `  ${identity.publicKey}  `,
-    );
+    await type(byTestId("add-contact-profile-link") as HTMLInputElement, `  ${npub}  `);
     const name = byTestId("add-contact-public-key-name") as HTMLInputElement;
     expect((byTestId("add-contact-preview") as HTMLButtonElement).disabled).toBe(true);
     await type(name, "Ada Key");
@@ -1189,19 +1304,19 @@ describe("honest client-only wallet", () => {
 
     expect(window.location.hash).toMatch(/^#\/people\/p-[a-z0-9]+$/u);
     const saved = loadWalletState();
-    const contact = saved.state.contacts.find((person) => person.npub === identity.publicKey);
+    const contact = saved.state.contacts.find((person) => person.npub === npub);
     expect(saved.state.contacts).toHaveLength(initialContactCount + 1);
     expect(contact).toMatchObject({
       name: "Ada Key",
       proofs: [],
-      npub: identity.publicKey,
+      npub,
     });
     const contactRoute = window.location.hash;
     await mount(contactRoute);
     expect(maybeByText("Ada Key")).toBeDefined();
 
     await mount("#/people?sheet=add");
-    await type(byTestId("add-contact-profile-link") as HTMLInputElement, identity.publicKey);
+    await type(byTestId("add-contact-profile-link") as HTMLInputElement, npub);
     await type(byTestId("add-contact-public-key-name") as HTMLInputElement, "Duplicate");
     await click(byTestId("add-contact-preview"));
     await click(byTestId("add-contact-save"));

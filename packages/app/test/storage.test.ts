@@ -3,11 +3,13 @@ import { SEED_CARDS, SEED_CONTACTS } from "@keychain/core";
 import { createInitialActivity } from "../src/activity.ts";
 import {
   createInitialWalletState,
+  decodeWalletBackup,
   decodeWalletSnapshot,
   loadWalletState,
   saveWalletState,
   WALLET_STORAGE_KEY,
   type WalletState,
+  walletBackup,
   walletSnapshot,
 } from "../src/storage.ts";
 
@@ -23,6 +25,30 @@ const seededState = (): WalletState => ({
 });
 
 describe("wallet snapshot validation", () => {
+  test("creates a selective app backup with individually chosen identities", () => {
+    const state = seededState();
+    const selected = state.cards[1];
+    if (selected === undefined) throw new Error("Seed state needs a second identity");
+
+    const backup = walletBackup(state, {
+      cardIds: [selected.id],
+      settings: false,
+      contacts: true,
+    });
+
+    expect(decodeWalletBackup(backup)).toEqual({
+      ok: true,
+      state: {
+        cards: [selected],
+        contacts: state.contacts,
+        activeId: selected.id,
+        theme: "system",
+        activity: [],
+      },
+      included: { settings: false, contacts: true },
+    });
+  });
+
   test("round-trips a valid versioned snapshot", () => {
     const state = createInitialWalletState(2_000_000_000_000);
     const snapshot = walletSnapshot(state);
@@ -163,6 +189,21 @@ describe("wallet local storage", () => {
       walletSnapshot(state),
     );
     expect(loadWalletState()).toEqual({ ok: true, state });
+  });
+
+  test("persists contacts that use a generated default avatar", () => {
+    const state = seededState();
+    const contact = state.contacts[0];
+    if (contact === undefined) throw new Error("Expected a seeded contact");
+    const generatedAvatarContact = {
+      ...contact,
+      avatar: "",
+      npub: "a828c6fa1e85bcbf6a41c443965d4646eadce9675d2f12ec2a9fab7ed1e4e241",
+    };
+    const next = { ...state, contacts: [generatedAvatarContact, ...state.contacts.slice(1)] };
+
+    expect(saveWalletState(next)).toEqual({ ok: true });
+    expect(loadWalletState()).toEqual({ ok: true, state: next });
   });
 
   test("uses initial state when no snapshot exists", () => {

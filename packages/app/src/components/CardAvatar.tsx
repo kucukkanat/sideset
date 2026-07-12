@@ -1,16 +1,18 @@
 import { createAvatar } from "@dicebear/core";
 import * as notionists from "@dicebear/notionists";
-import type { Card } from "@keychain/core";
+import type { IdentityKeyPair } from "@keychain/core";
 import type { CSSProperties, ReactElement } from "react";
 
 const generatedAvatar = (seed: string): string => createAvatar(notionists, { seed }).toDataUri();
 
 export const CardAvatar = ({
   card,
+  seed = card.identity?.publicKey ?? card.id,
   className,
   style,
 }: {
-  card: Pick<Card, "id" | "avatar" | "identity">;
+  card: { readonly id: string; readonly avatar: string; readonly identity?: IdentityKeyPair };
+  seed?: string;
   className?: string;
   style?: CSSProperties;
 }): ReactElement =>
@@ -47,7 +49,7 @@ export const CardAvatar = ({
         ...style,
       }}
       data-testid="card-generated-avatar"
-      src={generatedAvatar(card.identity?.publicKey ?? card.id)}
+      src={generatedAvatar(seed)}
       alt=""
     />
   );

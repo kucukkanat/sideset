@@ -15,23 +15,21 @@ name without silently breaking existing wallets, backups, or shared links.
 | --- | --- |
 | [`@keychain/core`](packages/core/README.md) | Pure domain logic — cards, account metadata, palettes, and carousel geometry |
 | [`@keychain/app`](packages/app/README.md) | React PWA — hash routing, local persistence, encrypted backups, and UI |
-| [`@sideset/branding`](packages/branding/README.md) | Brand strategy, production assets, motion, typography, and typed design tokens |
-| [`@sideset/site`](packages/site/README.md) | Responsive marketing, privacy, security, and public brand-portal pages |
+
+Both packages use feature-first internals. Application composition lives in `app/`, vertical product
+slices live in `features/`, and only code with multiple feature consumers belongs in `shared/`.
 
 ## Commands
 
 ```sh
 bun install
 bun run dev               # dev server (Bun serves index.html with HMR)
-bun run dev:site          # Sideset marketing site
 bun run build             # production bundle → packages/app/dist
-bun run build:site        # production marketing-site worker → packages/site/dist
 bun run preview           # build and serve the production PWA on :4173
-bun run preview:site      # serve an already-built marketing site
 bun run test              # unit + integration
-bun run test:unit         # core + branding + site unit suites
-bun run test:integration  # app + branding + site integration suites
-bun run check             # typecheck + lint + tests + marketing production build
+bun run test:unit         # pure @keychain/core suite
+bun run test:integration  # application and architecture suites
+bun run check             # typecheck + lint + tests + production build
 ```
 
 ## Design decisions

@@ -35,13 +35,14 @@ passStrength("CorrectHorse7!"); // 3
 
 ## Modules
 
-- `cards` — `createCard`, `addProof`, `removeProof`, `updateCard` (immutable transitions)
-- `contacts` — `searchContacts`, `updateContact`, `removeContacts` (immutable local contact management)
-- `providers` — provider metadata, proof ordering, `proofUserFor`, `proofVerificationUrl`
-- `identity` — `proofsSummary`, `friendlyId`, `greetingFor`, `passStrength`
-- `palettes` — the six card gradients, `paletteFor`
-- `carousel` — coverflow geometry: `cardPlacement`, `signedDistance`, `dragFraction`, `dampDrag`, `wrapIndex`
-- `qr` — decorative deterministic QR-look pattern (the app uses a separate standards-compliant encoder)
-- `seed` — demo cards and contacts
+- `src/features/cards/` — immutable card transitions, palettes, and coverflow geometry
+- `src/features/contacts/` — immutable local contact search, update, and removal
+- `src/features/identity/` — provider metadata, proof helpers, identity labels, and password strength
+- `src/features/sharing/` — deterministic decorative QR-look pattern (the app uses a standards-compliant encoder)
+- `src/shared/` — dependency-free domain types shared by multiple features
+- `src/testing/` — demo fixtures, exported for the prototype and tests
+
+`src/index.ts` remains the only package entry point, so the feature-driven internal layout does not
+expose deep imports or change the consumer API.
 
 Run the tests with `bun test packages/core`.

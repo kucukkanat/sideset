@@ -1,4 +1,10 @@
-export { addProof, createCard, removeProof, searchCards, updateCard } from "./cards.ts";
+export {
+  addProof,
+  createCard,
+  removeProof,
+  searchCards,
+  updateCard,
+} from "./features/cards/cards.ts";
 export {
   type CardPlacement,
   cardPlacement,
@@ -6,13 +12,14 @@ export {
   dragFraction,
   signedDistance,
   wrapIndex,
-} from "./carousel.ts";
+} from "./features/cards/carousel.ts";
+export { PALETTES, paletteFor } from "./features/cards/palettes.ts";
 export {
   type ContactChanges,
   removeContacts,
   searchContacts,
   updateContact,
-} from "./contacts.ts";
+} from "./features/contacts/contacts.ts";
 export {
   friendlyId,
   greetingFor,
@@ -20,16 +27,14 @@ export {
   proofsSummary,
   STRENGTH_COLORS,
   STRENGTH_LABELS,
-} from "./identity.ts";
-export { PALETTES, paletteFor } from "./palettes.ts";
+} from "./features/identity/identity.ts";
 export {
   PROOF_ORDER,
   PROVIDER_META,
   proofUserFor,
   proofVerificationUrl,
-} from "./providers.ts";
-export { QR_SIZE, qrPattern } from "./qr.ts";
-export { EMOJI_CHOICES, SEED_CARDS, SEED_CONTACTS } from "./seed.ts";
+} from "./features/identity/providers.ts";
+export { QR_SIZE, qrPattern } from "./features/sharing/qr.ts";
 export type {
   Card,
   Contact,
@@ -38,4 +43,5 @@ export type {
   Proof,
   ProviderId,
   ProviderMeta,
-} from "./types.ts";
+} from "./shared/types.ts";
+export { EMOJI_CHOICES, SEED_CARDS, SEED_CONTACTS } from "./testing/seed.ts";

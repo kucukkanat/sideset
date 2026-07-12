@@ -1,7 +1,9 @@
 import { type Contact, PROVIDER_META, paletteFor, proofVerificationUrl } from "@keychain/core";
 import { Trash2 } from "lucide-react";
 import { type ReactElement, type RefObject, useEffect, useRef, useState } from "react";
+import { CardAvatar } from "../components/CardAvatar.tsx";
 import { BackIcon, CopyIcon, EditIcon, ProviderIcon, ShareIcon, TrashIcon } from "../icons.tsx";
+import { nostrPublicKey } from "../nostrKeys.ts";
 
 interface ContactDetailProps {
   contact: Contact;
@@ -100,7 +102,13 @@ export const ContactDetail = ({
           </button>
         </div>
         <div className="hero-id">
-          <div className="hero-avatar">{contact.avatar}</div>
+          <div className="hero-avatar">
+            <CardAvatar
+              card={contact}
+              seed={contact.npub || contact.id}
+              style={{ width: "100%", height: "100%" }}
+            />
+          </div>
           <div className="hero-name">{contact.name}</div>
           <div className="hero-tag">{contact.handle}</div>
           <div className="hero-bio">{contact.bio || "No notes or bio yet."}</div>
@@ -193,7 +201,7 @@ export const ContactDetail = ({
                 🔑
               </span>
               <span className="contact-copy-body">
-                <code>{contact.npub}</code>
+                <code>{nostrPublicKey(contact.npub)}</code>
                 <small>Tap to copy</small>
               </span>
               <CopyIcon />

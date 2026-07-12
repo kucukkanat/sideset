@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { CardAvatar } from "../components/CardAvatar.tsx";
 import {
   decodeSharedProfile,
   parseEd25519PublicKey,
@@ -231,7 +232,10 @@ export const AddContactSheet = ({
                 flex: "0 0 auto",
               }}
             >
-              {profile.avatar}
+              <CardAvatar
+                card={{ id: profile.publicKey ?? profile.sourceId, avatar: profile.avatar }}
+                style={{ width: "100%", height: "100%" }}
+              />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 17, fontWeight: 800 }}>{profile.name}</div>

@@ -1,15 +1,27 @@
 import { describe, expect, test } from "bun:test";
 import { SEED_CARDS } from "@keychain/core";
+import { nip19 } from "nostr-tools";
 import {
   addVerifiedGithubProof,
   createGithubVerificationCode,
   generateIdentityKeyPair,
+  identityFromPrivateKey,
   isGithubUsername,
   parseGithubProfile,
   verifySignedProof,
 } from "../src/accountVerification.ts";
 
 describe("GitHub account verification helpers", () => {
+  test("imports nsec private keys and derives the public key", async () => {
+    const identity = await generateIdentityKeyPair();
+    expect(identityFromPrivateKey(identity.privateKey)).toBeNull();
+    const secret = Uint8Array.from(identity.privateKey.match(/../gu) ?? [], (pair) =>
+      Number.parseInt(pair, 16),
+    );
+    expect(identityFromPrivateKey(nip19.nsecEncode(secret))).toEqual(identity);
+    expect(identityFromPrivateKey("not-a-key")).toBeNull();
+    expect(identityFromPrivateKey("0".repeat(64))).toBeNull();
+  });
   test("accepts GitHub usernames and rejects malformed values", () => {
     expect(isGithubUsername("octocat")).toBe(true);
     expect(isGithubUsername("octo-cat")).toBe(true);

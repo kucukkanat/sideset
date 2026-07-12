@@ -1,4 +1,4 @@
-import { passStrength, STRENGTH_COLORS, STRENGTH_LABELS } from "@keychain/core";
+import { type Card, passStrength, STRENGTH_COLORS, STRENGTH_LABELS } from "@keychain/core";
 import { type FormEvent, type ReactElement, useEffect, useState } from "react";
 import { CheckIcon, ShieldIcon } from "../icons.tsx";
 
@@ -6,19 +6,27 @@ export type BackupSaveResult =
   | { readonly ok: true; readonly contents: string; readonly filename: string }
   | { readonly ok: false; readonly message: string };
 
+export interface BackupSelection {
+  readonly cardIds: readonly string[];
+  readonly settings: boolean;
+  readonly contacts: boolean;
+}
+
 interface BackupDownload {
   readonly href: string;
   readonly filename: string;
 }
 
 export const BackupSheet = ({
-  label,
+  cards,
+  contactCount,
   onSave,
   onToast,
   onDone,
 }: {
-  label: string;
-  onSave: (password: string) => Promise<BackupSaveResult>;
+  cards: readonly Card[];
+  contactCount: number;
+  onSave: (password: string, selection: BackupSelection) => Promise<BackupSaveResult>;
   onToast: (msg: string) => void;
   onDone: () => void;
 }): ReactElement => {
@@ -26,6 +34,9 @@ export const BackupSheet = ({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [download, setDownload] = useState<BackupDownload | null>(null);
+  const [cardIds, setCardIds] = useState<readonly string[]>(cards.map(({ id }) => id));
+  const [settings, setSettings] = useState(true);
+  const [contacts, setContacts] = useState(true);
   const strength = passStrength(password);
   const strengthColor = STRENGTH_COLORS[Math.min(strength - 1, 2)] ?? "#B6A78E";
 
@@ -42,7 +53,7 @@ export const BackupSheet = ({
       return;
     }
     setStep("saving");
-    const result = await onSave(password);
+    const result = await onSave(password, { cardIds, settings, contacts });
     if (!result.ok) {
       setStep("intro");
       onToast(result.message);
@@ -89,8 +100,48 @@ export const BackupSheet = ({
             Save a local backup
           </div>
           <div className="sheet-lead" style={{ marginTop: 8, maxWidth: 300, lineHeight: 1.5 }}>
-            Download an encrypted copy of {label}. You’ll need its password to restore it later.
+            Choose what to include, then download one encrypted app backup.
           </div>
+          <fieldset
+            style={{ width: "100%", marginTop: 22, textAlign: "left", border: 0, padding: 0 }}
+          >
+            <legend className="sec-label">Identities</legend>
+            {cards.map((card) => (
+              <label key={card.id} style={{ display: "flex", gap: 10, padding: "9px 0" }}>
+                <input
+                  data-testid={`backup-card-${card.id}`}
+                  type="checkbox"
+                  checked={cardIds.includes(card.id)}
+                  onChange={() =>
+                    setCardIds((selected) =>
+                      selected.includes(card.id)
+                        ? selected.filter((id) => id !== card.id)
+                        : [...selected, card.id],
+                    )
+                  }
+                />
+                {card.name}
+              </label>
+            ))}
+            <label style={{ display: "flex", gap: 10, padding: "9px 0" }}>
+              <input
+                data-testid="backup-settings"
+                type="checkbox"
+                checked={settings}
+                onChange={(event) => setSettings(event.currentTarget.checked)}
+              />
+              Settings
+            </label>
+            <label style={{ display: "flex", gap: 10, padding: "9px 0" }}>
+              <input
+                data-testid="backup-contacts"
+                type="checkbox"
+                checked={contacts}
+                onChange={(event) => setContacts(event.currentTarget.checked)}
+              />
+              All contacts ({contactCount})
+            </label>
+          </fieldset>
           <div style={{ width: "100%", marginTop: 22, textAlign: "left" }}>
             <label className="sec-label" htmlFor="backup-password" style={{ display: "block" }}>
               Backup password
@@ -188,7 +239,9 @@ export const BackupSheet = ({
             type="submit"
             data-testid="backup-create"
             className="btn-dark press"
-            disabled={step === "saving" || strength < 2}
+            disabled={
+              step === "saving" || strength < 2 || (cardIds.length === 0 && !settings && !contacts)
+            }
             style={{
               marginTop: 20,
               border: 0,

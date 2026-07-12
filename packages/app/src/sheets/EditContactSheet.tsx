@@ -1,5 +1,6 @@
 import { type Contact, type ContactChanges, EMOJI_CHOICES, paletteFor } from "@keychain/core";
 import { type FormEvent, type ReactElement, useState } from "react";
+import { nostrPublicKey } from "../nostrKeys.ts";
 
 export type EditContactResult =
   | { readonly ok: true }
@@ -126,7 +127,7 @@ export const EditContactSheet = ({
       {contact.npub.length > 0 && (
         <div className="edit-contact-key-note">
           <strong>Public key</strong>
-          <code>{contact.npub}</code>
+          <code>{nostrPublicKey(contact.npub)}</code>
           <span>Identity keys can’t be edited.</span>
         </div>
       )}

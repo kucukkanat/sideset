@@ -5,7 +5,9 @@ import {
   ChevronRight,
   Clock3,
   Copy,
+  KeyRound,
   Link,
+  LockKeyhole,
   MessageSquare,
   Pencil,
   Plus,
@@ -77,6 +79,14 @@ export const ChevronIcon = ({ size = 18 }: { size?: number }): ReactElement => (
 
 export const CopyIcon = (): ReactElement => (
   <Copy aria-hidden="true" color="#C9BBA6" size={18} strokeWidth={2} />
+);
+
+export const LockIcon = (): ReactElement => (
+  <LockKeyhole aria-hidden="true" color="currentColor" size={18} strokeWidth={2.2} />
+);
+
+export const KeyIcon = (): ReactElement => (
+  <KeyRound aria-hidden="true" color="currentColor" size={18} strokeWidth={2.2} />
 );
 
 export const MessageIcon = (): ReactElement => (

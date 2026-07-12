@@ -1,29 +1,56 @@
 import { type FormEvent, type ReactElement, useState } from "react";
 import { MAX_BACKUP_BYTES } from "../backup.ts";
 import { CheckIcon, ShieldIcon } from "../icons.tsx";
+import type { BackupSelection } from "./BackupSheet.tsx";
 
 export type RestoreResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly message: string };
 
+export type RestorePreviewResult =
+  | {
+      readonly ok: true;
+      readonly cards: readonly { readonly id: string; readonly name: string }[];
+      readonly settings: boolean;
+      readonly contacts: boolean;
+      readonly contactCount: number;
+    }
+  | { readonly ok: false; readonly message: string };
+
 export const RestoreSheet = ({
   onRestore,
+  onPreview,
   onDone,
 }: {
-  onRestore: (contents: string, password: string) => Promise<RestoreResult>;
+  onPreview: (contents: string, password: string) => Promise<RestorePreviewResult>;
+  onRestore: (
+    contents: string,
+    password: string,
+    selection: BackupSelection,
+  ) => Promise<RestoreResult>;
   onDone: () => void;
 }): ReactElement => {
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<"form" | "restoring" | "done">("form");
+  const [step, setStep] = useState<"form" | "select" | "restoring" | "done">("form");
+  const [contents, setContents] = useState("");
+  const [preview, setPreview] = useState<Extract<
+    RestorePreviewResult,
+    { readonly ok: true }
+  > | null>(null);
+  const [selection, setSelection] = useState<BackupSelection>({
+    cardIds: [],
+    settings: false,
+    contacts: false,
+  });
 
   const restore = async (): Promise<void> => {
     if (file === null || password.length === 0) return;
     setError(null);
     setStep("restoring");
     try {
-      const result = await onRestore(await file.text(), password);
+      const result = await onRestore(contents, password, selection);
       if (!result.ok) {
         setError(result.message);
         setStep("form");
@@ -36,9 +63,35 @@ export const RestoreSheet = ({
       setStep("form");
     }
   };
+  const inspect = async (): Promise<void> => {
+    if (file === null || password.length === 0) return;
+    setError(null);
+    setStep("restoring");
+    try {
+      const nextContents = await file.text();
+      const result = await onPreview(nextContents, password);
+      if (!result.ok) {
+        setError(result.message);
+        setStep("form");
+        return;
+      }
+      setContents(nextContents);
+      setPreview(result);
+      setSelection({
+        cardIds: result.cards.map(({ id }) => id),
+        settings: result.settings,
+        contacts: result.contacts,
+      });
+      setStep("select");
+    } catch {
+      setError("The backup file could not be read");
+      setStep("form");
+    }
+  };
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    void restore();
+    if (step === "select") void restore();
+    else void inspect();
   };
 
   if (step === "done") {
@@ -49,7 +102,7 @@ export const RestoreSheet = ({
         </div>
         <div style={{ fontSize: 22, fontWeight: 800, marginTop: 20 }}>Backup restored</div>
         <div className="sheet-lead" style={{ maxWidth: 275 }}>
-          Your cards, contacts, appearance, and activity are back on this device.
+          The selected backup data was merged into this device.
         </div>
         <button
           type="button"
@@ -61,6 +114,72 @@ export const RestoreSheet = ({
           Done
         </button>
       </div>
+    );
+  }
+
+  if (step === "select" && preview !== null) {
+    const empty = selection.cardIds.length === 0 && !selection.settings && !selection.contacts;
+    return (
+      <form data-testid="restore-selection" onSubmit={submit}>
+        <div className="sheet-title">Choose what to import</div>
+        <div className="sheet-lead">Selected data will merge with what is already in the app.</div>
+        <fieldset style={{ border: 0, padding: 0, marginTop: 20 }}>
+          <legend className="sec-label">Identities</legend>
+          {preview.cards.map((card) => (
+            <label key={card.id} style={{ display: "flex", gap: 10, padding: "9px 0" }}>
+              <input
+                data-testid={`restore-card-${card.id}`}
+                type="checkbox"
+                checked={selection.cardIds.includes(card.id)}
+                onChange={() =>
+                  setSelection((current) => ({
+                    ...current,
+                    cardIds: current.cardIds.includes(card.id)
+                      ? current.cardIds.filter((id) => id !== card.id)
+                      : [...current.cardIds, card.id],
+                  }))
+                }
+              />
+              {card.name}
+            </label>
+          ))}
+          {preview.settings && (
+            <label style={{ display: "flex", gap: 10, padding: "9px 0" }}>
+              <input
+                data-testid="restore-settings"
+                type="checkbox"
+                checked={selection.settings}
+                onChange={(event) =>
+                  setSelection((current) => ({ ...current, settings: event.currentTarget.checked }))
+                }
+              />
+              Settings
+            </label>
+          )}
+          {preview.contacts && (
+            <label style={{ display: "flex", gap: 10, padding: "9px 0" }}>
+              <input
+                data-testid="restore-contacts"
+                type="checkbox"
+                checked={selection.contacts}
+                onChange={(event) =>
+                  setSelection((current) => ({ ...current, contacts: event.currentTarget.checked }))
+                }
+              />
+              All contacts ({preview.contactCount})
+            </label>
+          )}
+        </fieldset>
+        <button
+          data-testid="restore-import"
+          className="btn-dark press"
+          type="submit"
+          disabled={empty}
+          style={{ marginTop: 20, border: 0, opacity: empty ? 0.45 : 1 }}
+        >
+          Import selected
+        </button>
+      </form>
     );
   }
 
@@ -162,7 +281,7 @@ export const RestoreSheet = ({
           ["--press" as string]: 0.97,
         }}
       >
-        {step === "restoring" ? "Restoring…" : "Restore backup"}
+        {step === "restoring" ? "Opening…" : "Continue"}
       </button>
     </form>
   );

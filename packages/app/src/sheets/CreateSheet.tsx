@@ -1,7 +1,7 @@
 import { type IdentityKeyPair, PALETTES, paletteFor } from "@keychain/core";
-import { RefreshCw, Upload } from "lucide-react";
+import { Eye, EyeOff, KeyRound, RefreshCw, Upload } from "lucide-react";
 import { type FormEvent, type ReactElement, useEffect, useRef, useState } from "react";
-import { generateIdentityKeyPair } from "../accountVerification.ts";
+import { generateIdentityKeyPair, identityFromPrivateKey } from "../accountVerification.ts";
 import { MAX_AVATAR_BYTES } from "../avatar.ts";
 import { CardAvatar } from "../components/CardAvatar.tsx";
 import { CheckIcon } from "../icons.tsx";
@@ -32,6 +32,9 @@ export const CreateSheet = ({
   const [identity, setIdentity] = useState<IdentityKeyPair | null>(null);
   const [color, setColor] = useState(0);
   const [isGeneratingIdentity, setIsGeneratingIdentity] = useState(true);
+  const [isImportingIdentity, setIsImportingIdentity] = useState(false);
+  const [privateKey, setPrivateKey] = useState("");
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
   const genTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     let active = true;
@@ -48,6 +51,7 @@ export const CreateSheet = ({
   }, []);
 
   const pal = paletteFor(color);
+  const importedIdentity = isImportingIdentity ? identityFromPrivateKey(privateKey) : null;
   const canCreate = name.trim().length > 0 && identity !== null;
   const regenerateAvatar = async (): Promise<void> => {
     setIsGeneratingIdentity(true);
@@ -94,7 +98,15 @@ export const CreateSheet = ({
     event.preventDefault();
     start();
   };
-
+  const useGeneratedIdentity = (): void => {
+    setIsImportingIdentity(false);
+    setPrivateKey("");
+    void regenerateAvatar();
+  };
+  const useImportedIdentity = (): void => {
+    setIsImportingIdentity(true);
+    setIdentity(null);
+  };
   return (
     <form
       data-testid="create-card-sheet"
@@ -252,6 +264,106 @@ export const CreateSheet = ({
               onInput={(event) => setEmail(event.currentTarget.value)}
               placeholder="you@example.com"
             />
+          </div>
+          <div style={{ marginTop: 18 }}>
+            {!isImportingIdentity ? (
+              <button
+                type="button"
+                data-testid="create-card-import-identity"
+                onClick={useImportedIdentity}
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(27,25,23,.14)",
+                  borderRadius: 14,
+                  padding: "12px 14px",
+                  background: "transparent",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <KeyRound aria-hidden="true" size={18} />
+                Use your Nostr private key
+              </button>
+            ) : (
+              <div
+                data-testid="create-card-identity-import"
+                style={{ padding: 14, borderRadius: 16, background: "rgba(232,80,42,.07)" }}
+              >
+                <div className="sec-label" style={{ letterSpacing: 0.6, marginBottom: 8 }}>
+                  Nostr private key
+                </div>
+                <div style={{ position: "relative" }}>
+                  <input
+                    data-testid="create-card-private-key"
+                    className="input"
+                    type={showPrivateKey ? "text" : "password"}
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={privateKey}
+                    onInput={(event) => {
+                      const value = event.currentTarget.value;
+                      setPrivateKey(value);
+                      setIdentity(identityFromPrivateKey(value));
+                    }}
+                    placeholder="nsec1…"
+                    aria-invalid={privateKey.length > 0 && importedIdentity === null}
+                    style={{ paddingRight: 48, fontFamily: "monospace" }}
+                  />
+                  <button
+                    type="button"
+                    data-testid="create-card-private-key-visibility"
+                    aria-label={showPrivateKey ? "Hide private key" : "Show private key"}
+                    onClick={() => setShowPrivateKey((shown) => !shown)}
+                    style={{
+                      position: "absolute",
+                      right: 4,
+                      top: 4,
+                      width: 40,
+                      height: 40,
+                      border: 0,
+                      background: "transparent",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {showPrivateKey ? (
+                      <EyeOff aria-hidden="true" size={19} />
+                    ) : (
+                      <Eye aria-hidden="true" size={19} />
+                    )}
+                  </button>
+                </div>
+                {privateKey.length > 0 && importedIdentity === null && (
+                  <div
+                    data-testid="create-card-private-key-error"
+                    style={{ color: "#B43820", fontSize: 13, marginTop: 7 }}
+                  >
+                    Enter a valid nsec private key.
+                  </div>
+                )}
+                <div style={{ fontSize: 13, lineHeight: 1.4, marginTop: 8, opacity: 0.72 }}>
+                  Your key stays on this device and will be included in wallet backups. Anyone with
+                  it can use your identity.
+                </div>
+                <button
+                  type="button"
+                  data-testid="create-card-use-generated-identity"
+                  onClick={useGeneratedIdentity}
+                  style={{
+                    border: 0,
+                    padding: "10px 0 0",
+                    background: "transparent",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Use a new identity instead
+                </button>
+              </div>
+            )}
           </div>
           <button
             type="submit"

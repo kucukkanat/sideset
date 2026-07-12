@@ -1,6 +1,6 @@
 export type WalletSheet = "create" | "connect";
-export type CardSheet = "edit" | "share" | "backup" | "connect";
-export type PersonSheet = "edit";
+export type CardSheet = "edit" | "share" | "connect";
+export type PersonSheet = "edit" | "share";
 export type SettingsSheet = "backup" | "restore" | "appearance" | "help" | "reset";
 export type ToolOperation = "encrypt" | "decrypt" | "sign" | "verify" | "cloak";
 
@@ -108,7 +108,7 @@ const parseWallet = (params: URLSearchParams): Route => {
 };
 
 const parseCard = (cardId: string, params: URLSearchParams): Route => {
-  const sheet = optionalSheet(params, ["edit", "share", "backup", "connect"] as const);
+  const sheet = optionalSheet(params, ["edit", "share", "connect"] as const);
   if (sheet === undefined) return DEFAULT_ROUTE;
   return { page: "card", cardId, ...(sheet === null ? {} : { sheet }) };
 };
@@ -134,7 +134,7 @@ const parsePeople = (params: URLSearchParams): Route => {
 };
 
 const parsePerson = (contactId: string, params: URLSearchParams): Route => {
-  const sheet = optionalSheet(params, ["edit"] as const);
+  const sheet = optionalSheet(params, ["edit", "share"] as const);
   if (sheet === undefined) return DEFAULT_ROUTE;
   return { page: "person", contactId, ...(sheet === null ? {} : { sheet }) };
 };

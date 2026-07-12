@@ -14,3 +14,27 @@ export const nostrDisplayKeys = (
   publicKey: nip19.npubEncode(identity.publicKey),
   privateKey: nip19.nsecEncode(keyBytes(identity.privateKey)),
 });
+
+export const nostrPublicKey = (value: string): string | null => {
+  const normalized = value.trim();
+  if (HEX_KEY.test(normalized)) return nip19.npubEncode(normalized);
+  try {
+    const decoded = nip19.decode(normalized);
+    return decoded.type === "npub" && typeof decoded.data === "string"
+      ? nip19.npubEncode(decoded.data)
+      : null;
+  } catch {
+    return normalized.startsWith("npub1") ? normalized : null;
+  }
+};
+
+export const nostrPublicKeyHex = (value: string): string | null => {
+  const normalized = value.trim();
+  if (HEX_KEY.test(normalized)) return normalized;
+  try {
+    const decoded = nip19.decode(normalized);
+    return decoded.type === "npub" && typeof decoded.data === "string" ? decoded.data : null;
+  } catch {
+    return null;
+  }
+};

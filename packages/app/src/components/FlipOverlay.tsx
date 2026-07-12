@@ -115,7 +115,11 @@ export const FlipOverlay = ({
                   {!("mutuals" in subject) ? (
                     <CardAvatar card={subject} style={{ width: "100%", height: "100%" }} />
                   ) : (
-                    subject.avatar
+                    <CardAvatar
+                      card={subject}
+                      seed={subject.npub || subject.id}
+                      style={{ width: "100%", height: "100%" }}
+                    />
                   )}
                 </div>
                 <div>
@@ -167,7 +171,11 @@ export const FlipOverlay = ({
               {!("mutuals" in subject) ? (
                 <CardAvatar card={subject} style={{ width: "100%", height: "100%" }} />
               ) : (
-                subject.avatar
+                <CardAvatar
+                  card={subject}
+                  seed={subject.npub || subject.id}
+                  style={{ width: "100%", height: "100%" }}
+                />
               )}
             </div>
             <div className="hero-name">{subject.name}</div>

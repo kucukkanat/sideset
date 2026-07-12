@@ -1,6 +1,7 @@
 import type { Card, Contact, Proof, ProviderId } from "@keychain/core";
 import { verifySignedProof } from "./accountVerification.ts";
 import { isAvatar } from "./avatar.ts";
+import { nostrPublicKey, nostrPublicKeyHex } from "./nostrKeys.ts";
 
 export interface SharedProfile {
   readonly version: 1;
@@ -55,10 +56,7 @@ const isProvider = (value: unknown): value is ProviderId =>
 const isBase64Url = (value: unknown): value is string =>
   typeof value === "string" && /^[A-Za-z0-9_-]+$/u.test(value);
 
-export const parseEd25519PublicKey = (value: string): string | null => {
-  const normalized = value.trim();
-  return /^[0-9a-f]{64}$/u.test(normalized) ? normalized : null;
-};
+export const parseEd25519PublicKey = (value: string): string | null => nostrPublicKeyHex(value);
 
 const isEd25519PublicKey = (value: string): boolean => parseEd25519PublicKey(value) !== null;
 
@@ -74,7 +72,7 @@ export const sharedProfileFromPublicKey = (
     sourceId: publicKey,
     publicKey,
     name,
-    handle: `${publicKey.slice(0, 8)}…${publicKey.slice(-6)}`,
+    handle: `${nostrPublicKey(publicKey)?.slice(0, 12)}…`,
     avatar: "🔑",
     color: 3,
     bio: "",
@@ -169,7 +167,6 @@ export const decodeSharedProfile = (encoded: string): SharedProfileResult => {
       (value.email !== undefined &&
         (typeof value.email !== "string" || value.email.length > 254)) ||
       typeof value.avatar !== "string" ||
-      value.avatar.trim().length === 0 ||
       !isAvatar(value.avatar) ||
       typeof value.color !== "number" ||
       !Number.isInteger(value.color) ||
@@ -262,5 +259,5 @@ export const sharedProfileToContact = (
   mutuals: 0,
   bio: profile.bio,
   proofs: verifiedProofs,
-  npub: profile.publicKey ?? profile.identityId ?? "",
+  npub: nostrPublicKey(profile.publicKey ?? profile.identityId ?? "") ?? "",
 });

@@ -1,20 +1,20 @@
-import { type Card, paletteFor } from "@keychain/core";
+import { type Card, type Contact, paletteFor } from "@keychain/core";
 import { type ReactElement, useEffect, useRef, useState } from "react";
 import { QrCode } from "../components/QrCode.tsx";
 import { copyText, shareProfile } from "../sharing.ts";
 
 export const ShareSheet = ({
-  card,
+  subject,
   shareUrl,
   onToast,
 }: {
-  card: Card;
+  subject: Card | Contact;
   shareUrl: string;
   onToast: (msg: string) => void;
 }): ReactElement => {
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pal = paletteFor(card.color);
+  const pal = paletteFor(subject.color);
   useEffect(() => () => clearTimeout(copyTimer.current), []);
 
   const copy = async (): Promise<void> => {
@@ -31,8 +31,8 @@ export const ShareSheet = ({
 
   const share = async (): Promise<void> => {
     const result = await shareProfile({
-      title: `${card.name} profile`,
-      text: `Add my ${card.name} profile`,
+      title: `${subject.name} profile`,
+      text: `Add ${subject.name}'s profile`,
       url: shareUrl,
     });
     if (!result.ok) {
@@ -53,7 +53,7 @@ export const ShareSheet = ({
         animation: "riseIn .4s ease",
       }}
     >
-      <div className="sheet-title">Share {card.name}</div>
+      <div className="sheet-title">Share {subject.name}</div>
       <div className="sheet-lead" style={{ maxWidth: 280 }}>
         A friend can scan this code or open your link to add the profile.
       </div>
@@ -89,7 +89,7 @@ export const ShareSheet = ({
         data-theme-text="primary"
         style={{ marginTop: 16, fontSize: 14, fontWeight: 800, color: "var(--kc-text)" }}
       >
-        @{card.handle}
+        @{subject.handle.replace(/^@/u, "")}
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 18, width: "100%" }}>
         <button

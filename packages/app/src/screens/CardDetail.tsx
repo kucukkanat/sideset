@@ -12,6 +12,8 @@ import {
   BackIcon,
   CopyIcon,
   EditIcon,
+  KeyIcon,
+  LockIcon,
   PlusIcon,
   ProviderIcon,
   ShareIcon,
@@ -28,7 +30,6 @@ interface CardDetailProps {
   onBack: () => void;
   onEdit: () => void;
   onShare: () => void;
-  onBackup: () => void;
   onActivate: () => void;
   onCopyPublicKey: (publicKey: string) => void;
   onCopyPrivateKey: (privateKey: string) => void;
@@ -44,7 +45,6 @@ export const CardDetail = ({
   onBack,
   onEdit,
   onShare,
-  onBackup,
   onActivate,
   onCopyPublicKey,
   onCopyPrivateKey,
@@ -74,7 +74,7 @@ export const CardDetail = ({
     holdTimer.current = setTimeout(() => {
       setIsHoldingVault(false);
       setIsVaultOpen(true);
-      sealTimer.current = setTimeout(sealVault, 30_000);
+      sealTimer.current = setTimeout(sealVault, 10_000);
     }, 1_200);
   };
   const handleVaultKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
@@ -212,7 +212,7 @@ export const CardDetail = ({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: "1fr",
           gap: 10,
           padding: "12px 24px 4px",
         }}
@@ -227,17 +227,6 @@ export const CardDetail = ({
             <ShareIcon />
           </div>
           <div className="lbl">Share</div>
-        </div>
-        <div
-          data-testid="card-detail-backup"
-          role="button"
-          className="action-tile press"
-          onClick={onBackup}
-        >
-          <div className="ico" style={{ background: "#E8F0FF" }}>
-            <ShieldIcon />
-          </div>
-          <div className="lbl">Export backup</div>
         </div>
       </div>
 
@@ -340,20 +329,39 @@ export const CardDetail = ({
           </button>
 
           <div className={`key-vault${isVaultOpen ? " is-open" : ""}`}>
+            <div className="key-vault-glow" aria-hidden="true" />
             <div className="key-vault-topline">
-              <div>
-                <div className="card-key-kind">Private key</div>
-                <div className="key-vault-warning">Anyone with this key can become you.</div>
+              <div className="key-vault-title-group">
+                <div className="key-vault-emblem" aria-hidden="true">
+                  {isVaultOpen ? <KeyIcon /> : <LockIcon />}
+                </div>
+                <div>
+                  <div className="card-key-kind">Private key</div>
+                  <div className="key-vault-warning">
+                    {isVaultOpen ? "Keep your screen private." : "Your identity's master secret."}
+                  </div>
+                </div>
               </div>
-              <div className="key-vault-status">{isVaultOpen ? "Vault open" : "Sealed"}</div>
+              <div className="key-vault-status">
+                <span aria-hidden="true" />
+                {isVaultOpen ? "Exposed" : "Protected"}
+              </div>
             </div>
 
             {isVaultOpen ? (
-              <>
-                <code data-testid="card-detail-private-key" className="key-vault-secret">
-                  {displayKeys.privateKey}
-                </code>
-                <div className="key-vault-timer">Auto-seals in 30 seconds</div>
+              <div className="key-vault-open-content">
+                <div className="key-vault-secret-shell">
+                  <div className="key-vault-secret-label">Nostr private key</div>
+                  <code data-testid="card-detail-private-key" className="key-vault-secret">
+                    {displayKeys.privateKey}
+                  </code>
+                </div>
+                <div className="key-vault-timer">
+                  <span className="key-vault-timer-track" aria-hidden="true">
+                    <span />
+                  </span>
+                  <span>Auto-seals in 10 seconds</span>
+                </div>
                 <div className="key-vault-actions">
                   <button
                     data-testid="card-detail-seal-private-key"
@@ -387,16 +395,19 @@ export const CardDetail = ({
                   )}
                 </div>
                 {isCopyArmed && (
-                  <div className="key-vault-confirmation">
-                    Final check: nobody else can see your screen.
+                  <div className="key-vault-confirmation" role="status">
+                    <span aria-hidden="true">!</span>
+                    Confirm your screen is private, then copy.
                   </div>
                 )}
-              </>
+              </div>
             ) : (
-              <>
+              <div className="key-vault-sealed-content">
                 <div className="key-vault-concealed" aria-hidden="true">
-                  •••• •••• •••• ••••
+                  <span>nsec1</span>
+                  <span className="key-vault-mask">••••••••••••••••••••••</span>
                 </div>
+                <div className="key-vault-safety">Never share this key with anyone.</div>
                 <button
                   data-testid="card-detail-reveal-private-key"
                   type="button"
@@ -411,10 +422,18 @@ export const CardDetail = ({
                 >
                   <span className="key-vault-hold-fill" />
                   <span className="key-vault-hold-label">
-                    {isHoldingVault ? "Keep holding…" : "Hold to open vault"}
+                    <span className="key-vault-hold-icon" aria-hidden="true">
+                      <LockIcon />
+                    </span>
+                    <span>
+                      <strong>
+                        {isHoldingVault ? "Keep holding…" : "Press and hold to reveal"}
+                      </strong>
+                      <small>{isHoldingVault ? "Release to cancel" : "Opens for 10 seconds"}</small>
+                    </span>
                   </span>
                 </button>
-              </>
+              </div>
             )}
           </div>
         </section>

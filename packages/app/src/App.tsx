@@ -27,6 +27,7 @@ import { BottomNav, type NavKey } from "./components/BottomNav.tsx";
 import { FlipOverlay } from "./components/FlipOverlay.tsx";
 import { Sheet } from "./components/Sheet.tsx";
 import { FALLBACK_CARD_RECT, FALLBACK_HERO_RECT, type Flip, type Rect } from "./flip.ts";
+import { nostrPublicKey } from "./nostrKeys.ts";
 import { routeWithoutOverlay } from "./routing.ts";
 import { Activity } from "./screens/Activity.tsx";
 import { CardDetail } from "./screens/CardDetail.tsx";
@@ -40,28 +41,32 @@ import {
   type SharedProfile,
   sharedProfileToContact,
 } from "./sharedProfile.ts";
-import { copyText, profileShareUrl, shareProfile } from "./sharing.ts";
+import { copyText, profileShareUrl } from "./sharing.ts";
 import { type AddContactResult, AddContactSheet } from "./sheets/AddContactSheet.tsx";
 import { AppearanceSheet } from "./sheets/AppearanceSheet.tsx";
-import { type BackupSaveResult, BackupSheet } from "./sheets/BackupSheet.tsx";
+import { type BackupSaveResult, type BackupSelection, BackupSheet } from "./sheets/BackupSheet.tsx";
 import { ConnectAccountSheet } from "./sheets/ConnectAccountSheet.tsx";
 import { CreateSheet } from "./sheets/CreateSheet.tsx";
 import { type EditContactResult, EditContactSheet } from "./sheets/EditContactSheet.tsx";
 import { EditSheet } from "./sheets/EditSheet.tsx";
 import { HelpSheet } from "./sheets/HelpSheet.tsx";
 import { ResetSheet } from "./sheets/ResetSheet.tsx";
-import { type RestoreResult, RestoreSheet } from "./sheets/RestoreSheet.tsx";
+import {
+  type RestorePreviewResult,
+  type RestoreResult,
+  RestoreSheet,
+} from "./sheets/RestoreSheet.tsx";
 import { ShareSheet } from "./sheets/ShareSheet.tsx";
 import {
   createInitialWalletState,
-  decodeWalletSnapshot,
+  decodeWalletBackup,
   loadWalletState,
   MAX_CARDS,
   MAX_CONTACTS,
   saveWalletState,
   type Theme,
   type WalletState,
-  walletSnapshot,
+  walletBackup,
 } from "./storage.ts";
 import { useHashRouter } from "./useHashRouter.ts";
 
@@ -81,7 +86,8 @@ export const App = (): ReactElement => {
   const [loaded] = useState(loadWalletState);
   const [wallet, setWallet] = useState<WalletState>(loaded.state);
   const [firstCardCreationOpen, setFirstCardCreationOpen] = useState(
-    loaded.state.cards.length === 0,
+    loaded.state.cards.length === 0 &&
+      !(route.page === "people" && route.sheet === "add" && route.profile !== undefined),
   );
   const [contactQuery, setContactQuery] = useState("");
   const [contactManaging, setContactManaging] = useState(false);
@@ -523,7 +529,7 @@ export const App = (): ReactElement => {
       contacts.some(
         (existing) =>
           existing.id === next.id ||
-          (next.npub.length > 0 && existing.npub === next.npub) ||
+          (next.npub.length > 0 && nostrPublicKey(existing.npub) === nostrPublicKey(next.npub)) ||
           existing.handle.toLowerCase() === next.handle.toLowerCase(),
       )
     ) {
@@ -533,7 +539,12 @@ export const App = (): ReactElement => {
       withActivity(
         { ...state, contacts: [...state.contacts, next] },
         createActivity(
-          { kind: "emoji", emoji: next.avatar, bg: "#E9F7EC" },
+          {
+            kind: "emoji",
+            emoji:
+              next.avatar.length > 0 && !next.avatar.startsWith("data:image/") ? next.avatar : "👤",
+            bg: "#E9F7EC",
+          },
           `Added ${next.name}`,
           "Saved to contacts",
         ),
@@ -617,22 +628,12 @@ export const App = (): ReactElement => {
     );
   };
 
-  const shareContact = async (person: Contact, url: string): Promise<void> => {
-    const result = await shareProfile({
-      title: `${person.name} profile`,
-      text: `Add ${person.name} to your contacts`,
-      url,
-    });
-    if (!result.ok) {
-      if (result.reason !== "cancelled") showToast("Sharing isn’t available right now");
-      return;
-    }
-    showToast(result.method === "clipboard" ? "Profile link copied" : "Profile shared");
-  };
-
-  const saveBackup = async (password: string): Promise<BackupSaveResult> => {
+  const saveBackup = async (
+    password: string,
+    selection: BackupSelection,
+  ): Promise<BackupSaveResult> => {
     try {
-      const contents = await createEncryptedBackup(walletSnapshot(wallet), password);
+      const contents = await createEncryptedBackup(walletBackup(wallet, selection), password);
       setWallet((state) =>
         withActivity(
           state,
@@ -649,7 +650,10 @@ export const App = (): ReactElement => {
     }
   };
 
-  const restoreBackup = async (contents: string, password: string): Promise<RestoreResult> => {
+  const previewBackup = async (
+    contents: string,
+    password: string,
+  ): Promise<RestorePreviewResult> => {
     const decrypted = await readEncryptedBackup(contents, password);
     if (!decrypted.ok) {
       return {
@@ -660,14 +664,58 @@ export const App = (): ReactElement => {
             : "This isn’t a supported Keychain backup",
       };
     }
-    const decoded = decodeWalletSnapshot(decrypted.value);
+    const decoded = decodeWalletBackup(decrypted.value);
     if (!decoded.ok) return { ok: false, message: "This backup contains invalid data" };
+    return {
+      ok: true,
+      cards: decoded.state.cards.map(({ id, name }) => ({ id, name })),
+      settings: decoded.included.settings,
+      contacts: decoded.included.contacts,
+      contactCount: decoded.state.contacts.length,
+    };
+  };
+
+  const restoreBackup = async (
+    contents: string,
+    password: string,
+    selection: BackupSelection,
+  ): Promise<RestoreResult> => {
+    const decrypted = await readEncryptedBackup(contents, password);
+    if (!decrypted.ok) return { ok: false, message: "The backup could not be opened again" };
+    const decoded = decodeWalletBackup(decrypted.value);
+    if (!decoded.ok) return { ok: false, message: "This backup contains invalid data" };
+    const selectedCards = decoded.state.cards.filter(({ id }) => selection.cardIds.includes(id));
+    const importedCards = new Map(selectedCards.map((card) => [card.id, card]));
+    const importedContacts = new Map(
+      decoded.state.contacts.map((contact) => [contact.id, contact]),
+    );
+    const cards = [
+      ...wallet.cards.map((card) => importedCards.get(card.id) ?? card),
+      ...selectedCards.filter((card) => !wallet.cards.some(({ id }) => id === card.id)),
+    ];
+    const contacts =
+      decoded.included.contacts && selection.contacts
+        ? [
+            ...wallet.contacts.map((contact) => importedContacts.get(contact.id) ?? contact),
+            ...decoded.state.contacts.filter(
+              (contact) => !wallet.contacts.some(({ id }) => id === contact.id),
+            ),
+          ]
+        : wallet.contacts;
     const restored = withActivity(
-      decoded.state,
+      {
+        ...wallet,
+        cards,
+        contacts,
+        activeId: wallet.activeId || cards[0]?.id || "",
+        ...(decoded.included.settings && selection.settings
+          ? { theme: decoded.state.theme, activity: decoded.state.activity }
+          : {}),
+      },
       createActivity(
         { kind: "emoji", emoji: "📥", bg: "#FFF6DB" },
         "Restored a local backup",
-        "Cards and contacts restored",
+        "Selected backup data imported",
       ),
     );
     if (!saveWalletState(restored).ok) {
@@ -711,7 +759,9 @@ export const App = (): ReactElement => {
   const contactUrl = contact === undefined ? "" : shareUrlFor(contact);
   const sheetLabel =
     route.page === "person"
-      ? "Edit contact"
+      ? route.sheet === "share"
+        ? "Share contact"
+        : "Edit contact"
       : route.page === "people"
         ? "Add contact"
         : route.page === "settings"
@@ -816,7 +866,6 @@ export const App = (): ReactElement => {
             onBack={backFromDetail}
             onEdit={() => push({ page: "card", cardId: detail.id, sheet: "edit" })}
             onShare={() => push({ page: "card", cardId: detail.id, sheet: "share" })}
-            onBackup={() => push({ page: "card", cardId: detail.id, sheet: "backup" })}
             onActivate={() => activate(detail)}
             onCopyPublicKey={(publicKey) => void copyPublicKey(publicKey)}
             onCopyPrivateKey={(privateKey) => void copyPrivateKey(privateKey)}
@@ -834,8 +883,8 @@ export const App = (): ReactElement => {
             onEdit={() => push({ page: "person", contactId: contact.id, sheet: "edit" })}
             onRemove={() => removeContactIds([contact.id])}
             onCopyProfileLink={() => void copyProfileLink(contactUrl)}
-            onCopyPublicKey={() => void copyPublicKey(contact.npub)}
-            onShare={() => void shareContact(contact, contactUrl)}
+            onCopyPublicKey={() => void copyPublicKey(nostrPublicKey(contact.npub) ?? "")}
+            onShare={() => push({ page: "person", contactId: contact.id, sheet: "share" })}
             onRemovalDialogChange={setContactRemovalOpen}
           />
         )}
@@ -877,7 +926,10 @@ export const App = (): ReactElement => {
               />
             )}
             {route.page === "card" && detail !== undefined && route.sheet === "share" && (
-              <ShareSheet card={detail} shareUrl={shareUrlFor(detail)} onToast={showToast} />
+              <ShareSheet subject={detail} shareUrl={shareUrlFor(detail)} onToast={showToast} />
+            )}
+            {route.page === "person" && contact !== undefined && route.sheet === "share" && (
+              <ShareSheet subject={contact} shareUrl={contactUrl} onToast={showToast} />
             )}
             {route.page === "card" && detail !== undefined && route.sheet === "edit" && (
               <EditSheet card={detail} onSave={saveEdit} onToast={showToast} />
@@ -885,10 +937,10 @@ export const App = (): ReactElement => {
             {route.page === "person" && contact !== undefined && route.sheet === "edit" && (
               <EditContactSheet contact={contact} onCancel={closeOverlay} onSave={saveContact} />
             )}
-            {((route.page === "card" && route.sheet === "backup") ||
-              (route.page === "settings" && route.sheet === "backup")) && (
+            {route.page === "settings" && route.sheet === "backup" && (
               <BackupSheet
-                label="all your cards and contacts"
+                cards={cards}
+                contactCount={contacts.length}
                 onSave={saveBackup}
                 onToast={showToast}
                 onDone={() => {
@@ -899,6 +951,7 @@ export const App = (): ReactElement => {
             )}
             {route.page === "settings" && route.sheet === "restore" && (
               <RestoreSheet
+                onPreview={previewBackup}
                 onRestore={restoreBackup}
                 onDone={() => {
                   closeOverlay();

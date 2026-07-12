@@ -933,16 +933,70 @@ a:focus-visible,
 .key-vault {
   position: relative;
   overflow: hidden;
-  padding: 16px;
+  padding: 18px;
+  isolation: isolate;
   transition:
-    border-color 0.25s,
-    box-shadow 0.25s;
+    border-color 0.35s ease,
+    box-shadow 0.35s ease,
+    background 0.35s ease;
 }
 .key-vault.is-open {
   border-color: color-mix(in srgb, var(--kc-accent) 48%, var(--kc-border));
+  background: color-mix(in srgb, var(--kc-accent) 2.5%, var(--kc-surface));
   box-shadow: 0 10px 28px -16px color-mix(in srgb, var(--kc-accent) 45%, transparent);
 }
+.key-vault-glow {
+  position: absolute;
+  z-index: -1;
+  width: 180px;
+  height: 180px;
+  top: -125px;
+  right: -70px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--kc-accent) 14%, transparent);
+  filter: blur(20px);
+  opacity: 0;
+  transform: scale(0.75);
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+.key-vault.is-open .key-vault-glow {
+  opacity: 1;
+  transform: scale(1);
+}
+.key-vault-title-group,
+.key-vault-hold-label,
+.key-vault-timer {
+  display: flex;
+  align-items: center;
+}
+.key-vault-title-group {
+  gap: 10px;
+}
+.key-vault-emblem {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--kc-muted);
+  background: var(--kc-surface-raised);
+  transition:
+    color 0.3s ease,
+    background 0.3s ease,
+    transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.key-vault.is-open .key-vault-emblem {
+  color: var(--kc-accent);
+  background: color-mix(in srgb, var(--kc-accent) 11%, var(--kc-surface));
+  transform: rotate(-8deg);
+}
 .key-vault-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   padding: 5px 8px;
   border-radius: 999px;
   color: var(--kc-muted);
@@ -952,27 +1006,58 @@ a:focus-visible,
   letter-spacing: 0.45px;
   text-transform: uppercase;
 }
+.key-vault-status span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
 .key-vault.is-open .key-vault-status {
   color: var(--kc-accent);
   background: color-mix(in srgb, var(--kc-accent) 10%, var(--kc-surface));
 }
 .key-vault-concealed {
-  margin-top: 14px;
-  color: var(--kc-faint);
+  display: flex;
+  margin-top: 18px;
+  padding: 14px 15px;
+  border: 1px solid color-mix(in srgb, var(--kc-border) 65%, transparent);
+  border-radius: 12px;
+  color: var(--kc-muted);
+  background: linear-gradient(
+    110deg,
+    var(--kc-surface-raised) 30%,
+    color-mix(in srgb, var(--kc-accent) 7%, var(--kc-surface-raised)) 50%,
+    var(--kc-surface-raised) 70%
+  );
+  background-size: 240% 100%;
   font-family: ui-monospace, "SFMono-Regular", monospace;
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 2px;
+  font-size: 12px;
+  font-weight: 800;
+  animation: vaultShimmer 5s ease-in-out infinite;
+}
+.key-vault-mask {
+  min-width: 0;
+  margin-left: 5px;
+  overflow: hidden;
+  color: var(--kc-faint);
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+}
+.key-vault-safety {
+  margin-top: 8px;
+  color: var(--kc-muted);
+  font-size: 10.5px;
+  font-weight: 650;
   text-align: center;
 }
 .key-vault-hold {
   position: relative;
   width: 100%;
-  min-height: 44px;
-  margin-top: 13px;
+  min-height: 58px;
+  margin-top: 15px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--kc-accent) 35%, var(--kc-border));
-  border-radius: 13px;
+  border-radius: 15px;
   color: var(--kc-accent);
   background: color-mix(in srgb, var(--kc-accent) 7%, var(--kc-surface));
   cursor: pointer;
@@ -984,7 +1069,7 @@ a:focus-visible,
 .key-vault-hold-fill {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--kc-accent) 16%, transparent);
+  background: color-mix(in srgb, var(--kc-accent) 18%, transparent);
   transform: scaleX(0);
   transform-origin: left;
 }
@@ -993,20 +1078,77 @@ a:focus-visible,
 }
 .key-vault-hold-label {
   position: relative;
+  justify-content: center;
+  gap: 10px;
+  line-height: 1.15;
+  text-align: left;
+}
+.key-vault-hold-label strong,
+.key-vault-hold-label small {
+  display: block;
+}
+.key-vault-hold-label small {
+  margin-top: 3px;
+  color: var(--kc-muted);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.key-vault-hold-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--kc-accent) 11%, var(--kc-surface));
+  transition: transform 0.25s ease;
+}
+.key-vault-hold[data-holding="true"] .key-vault-hold-icon {
+  transform: scale(0.88);
+}
+.key-vault-open-content {
+  animation: vaultReveal 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.key-vault-secret-shell {
+  margin-top: 16px;
+  padding: 13px 14px;
+  border: 1px solid color-mix(in srgb, var(--kc-accent) 18%, var(--kc-border));
+  border-radius: 13px;
+  background: var(--kc-surface-raised);
+}
+.key-vault-secret-label {
+  color: var(--kc-muted);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
 }
 .key-vault-secret {
-  margin-top: 14px;
-  padding: 12px;
-  border-radius: 11px;
-  background: var(--kc-surface-raised);
+  margin-top: 7px;
   text-overflow: initial;
   white-space: normal;
   overflow-wrap: anywhere;
   user-select: all;
+  animation: vaultSecretBlur 10s linear forwards;
 }
 .key-vault-timer {
-  margin-top: 7px;
-  text-align: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.key-vault-timer-track {
+  height: 3px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--kc-surface-raised);
+}
+.key-vault-timer-track span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--kc-accent);
+  transform-origin: left;
+  animation: vaultCountdown 10s linear forwards;
 }
 .key-vault-actions {
   gap: 8px;
@@ -1035,15 +1177,58 @@ a:focus-visible,
   background: var(--kc-accent);
 }
 .key-vault-confirmation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   margin-top: 9px;
   color: var(--kc-warning-text);
   font-size: 11px;
   font-weight: 750;
   text-align: center;
 }
+.key-vault-confirmation span {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--kc-warning-bg);
+  font-size: 10px;
+}
 @keyframes vaultUnlock {
   to {
     transform: scaleX(1);
+  }
+}
+@keyframes vaultReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+@keyframes vaultCountdown {
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes vaultSecretBlur {
+  0%,
+  20% {
+    filter: blur(0);
+  }
+  to {
+    filter: blur(8px);
+  }
+}
+@keyframes vaultShimmer {
+  0%,
+  60%,
+  100% {
+    background-position: 100% 0;
+  }
+  80% {
+    background-position: 0 0;
   }
 }
 

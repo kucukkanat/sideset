@@ -35,7 +35,7 @@ export const AppearanceSheet = ({
       className="panel"
       role="radiogroup"
       aria-label="Theme"
-      style={{ marginTop: 22 }}
+      style={{ marginTop: 20 }}
     >
       {OPTIONS.map((option) => {
         const selected = option.value === theme;

@@ -72,7 +72,8 @@ describe("PWA assets", () => {
   test("keeps standalone content clear of the iOS status bar", async () => {
     const styles = await Bun.file(new URL("../src/styles.css", import.meta.url)).text();
     expect(styles).toContain("--kc-top-inset: calc(env(safe-area-inset-top) + 8px)");
-    expect(styles.match(/calc\(26px \+ var\(--kc-top-inset\)\)/gu)).toHaveLength(2);
+    expect(styles).toContain("--space-6: 24px");
+    expect(styles.match(/calc\(var\(--space-6\) \+ var\(--kc-top-inset\)\)/gu)).toHaveLength(3);
   });
 
   test("ships transparent light, dark, mark, and favicon PNGs", async () => {

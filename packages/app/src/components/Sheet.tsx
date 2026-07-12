@@ -118,15 +118,8 @@ export const Sheet = ({
     <>
       <div
         data-testid="sheet-backdrop"
+        className="sheet-backdrop"
         onClick={dismissible ? onClose : undefined}
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 80,
-          background: "rgba(30,20,10,.42)",
-          backdropFilter: "blur(3px)",
-          animation: "fadeIn .28s ease",
-        }}
       />
       <div
         ref={sheetRef}
@@ -141,59 +134,23 @@ export const Sheet = ({
           animation: dragY ? "none" : "sheetUp .4s cubic-bezier(.2,.9,.3,1)",
         }}
       >
-        <div
-          data-testid="sheet-handle"
-          onPointerDown={onHandleDown}
-          style={{
-            position: "relative",
-            padding: "12px 0 4px",
-            display: "flex",
-            justifyContent: "center",
-            cursor: "grab",
-            touchAction: "none",
-          }}
-        >
-          <div style={{ width: 38, height: 5, borderRadius: 3, background: "#DAD0C1" }} />
+        <div data-testid="sheet-handle" className="sheet-handle" onPointerDown={onHandleDown}>
+          <div className="sheet-grabber" />
           <button
             type="button"
             data-testid="sheet-close"
+            className="sheet-close"
             aria-label="Close"
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
               onClose();
             }}
-            style={{
-              position: "absolute",
-              top: 8,
-              right: 16,
-              width: 40,
-              height: 40,
-              border: "none",
-              borderRadius: "50%",
-              background: "var(--kc-surface-raised)",
-              color: "var(--kc-muted)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              padding: 0,
-            }}
           >
             <X aria-hidden="true" size={16} strokeWidth={2.2} />
           </button>
         </div>
-        <div
-          data-testid="sheet-content"
-          className="scr"
-          onPointerDown={onBodyDown}
-          style={{
-            overflowY: "auto",
-            maxHeight: "78vh",
-            padding: "8px 24px calc(34px + env(safe-area-inset-bottom))",
-            touchAction: "pan-y",
-          }}
-        >
+        <div data-testid="sheet-content" className="scr sheet-content" onPointerDown={onBodyDown}>
           {children}
         </div>
       </div>

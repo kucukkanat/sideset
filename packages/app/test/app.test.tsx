@@ -201,7 +201,7 @@ describe("honest client-only wallet", () => {
     const avatar = card.querySelector<HTMLElement>(
       '[data-testid^="card-"][data-testid$="-avatar"]',
     );
-    expect(card.style.width).toBe("350px");
+    expect(card.classList.contains("wallet-carousel-card")).toBe(true);
     expect(face?.style.userSelect).toBe("none");
     expect(avatar?.parentElement?.style.width).toBe("84px");
     expect(avatar?.parentElement?.style.height).toBe("84px");
@@ -338,9 +338,10 @@ describe("honest client-only wallet", () => {
     expect(avatar.style.justifyContent).toBe("center");
     expect(maybeByText("Wallet")).toBeDefined();
     expect(maybeByText("Connected accounts")).toBeDefined();
-    expect(maybeByText("Accounts shown on this card")).toBeDefined();
+    expect(maybeByText("Profiles visible on Everyday")).toBeDefined();
     expect(maybeByText("Connected X account")).toBeDefined();
-    expect(maybeByText("Connect account")).toBeDefined();
+    expect(maybeByTestId("home-connect-account")).toBeDefined();
+    expect(maybeByTestId("home-quick-actions")).toBeUndefined();
     expect(maybeByText("Coming soon")).toBeUndefined();
     expect(bodyText()).not.toMatch(
       /\bnostr\b|\brelay\b|\bproofs?\b|provably|public key|\bnpub\w*|\bsats\b/iu,
@@ -352,6 +353,29 @@ describe("honest client-only wallet", () => {
 
     const logos = Array.from(document.querySelectorAll<HTMLImageElement>(".home-brand-logo"));
     expect(logos.map((logo) => logo.getAttribute("src")?.endsWith(".png"))).toEqual([true, true]);
+  });
+
+  test("reuses unified headers and action buttons across top-level screens", async () => {
+    await mount("#/wallet");
+    const walletAdd = byTestId("home-action-new-identity");
+    expect(walletAdd.classList.contains("app-action-primary")).toBe(true);
+    expect(byTestId("home-search-identities").classList.contains("app-action-secondary")).toBe(
+      true,
+    );
+
+    await mount("#/people");
+    expect(byTestId("contacts-import-profile").className).toBe(walletAdd.className);
+    expect(byTestId("contacts-manage").classList.contains("app-action-secondary")).toBe(true);
+    expect(document.querySelector(".app-screen-header h1")?.textContent).toBe("People");
+
+    for (const [route, title] of [
+      ["#/activity", "Activity"],
+      ["#/tools/encrypt", "Tools"],
+      ["#/settings", "Settings"],
+    ] as const) {
+      await mount(route);
+      expect(document.querySelector(".app-screen-header h1")?.textContent).toBe(title);
+    }
   });
 
   test("uses contrasting theme colors for the card connect-account icon", async () => {
@@ -619,7 +643,7 @@ describe("honest client-only wallet", () => {
   test("opens a wallet card through navigation and supports a direct detail link", async () => {
     await mount();
 
-    await clickText("Everyday");
+    await click(byTestId("home-card-c1"));
     expect(window.location.hash).toBe("#/cards/c1");
     expect(maybeByText("This card is active")).toBeDefined();
     expect(maybeByText("Connected accounts")).toBeDefined();
@@ -787,7 +811,7 @@ describe("honest client-only wallet", () => {
   test("creates and selects a persisted card in the URL", async () => {
     await mount();
 
-    await clickText("New card");
+    await click(byTestId("home-action-new-identity"));
     expect(window.location.hash).toBe("#/wallet?card=c1&sheet=create");
     const name = document.querySelector<HTMLInputElement>('[data-testid="create-card-name"]');
     if (name === null) throw new Error("Missing card name field");

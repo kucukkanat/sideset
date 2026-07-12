@@ -108,7 +108,7 @@ export const CreateSheet = ({
             <div className="sheet-title">Create a card</div>
             <div className="sheet-lead">A separate profile for a part of your life.</div>
           </div>
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 22 }}>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 20 }}>
             <div
               style={{
                 width: 96,
@@ -137,8 +137,8 @@ export const CreateSheet = ({
             style={{
               display: "flex",
               justifyContent: "center",
-              gap: 10,
-              marginTop: 18,
+              gap: 12,
+              marginTop: 16,
               flexWrap: "wrap",
             }}
           >
@@ -187,7 +187,7 @@ export const CreateSheet = ({
             style={{
               display: "flex",
               justifyContent: "center",
-              gap: 9,
+              gap: 8,
               marginTop: 16,
             }}
           >
@@ -254,7 +254,7 @@ export const CreateSheet = ({
               placeholder="you@example.com"
             />
           </div>
-          <div style={{ marginTop: 18 }}>
+          <div style={{ marginTop: 16 }}>
             {!isImportingIdentity ? (
               <button
                 type="button"
@@ -280,7 +280,7 @@ export const CreateSheet = ({
             ) : (
               <div
                 data-testid="create-card-identity-import"
-                style={{ padding: 14, borderRadius: 16, background: "rgba(232,80,42,.07)" }}
+                style={{ padding: 16, borderRadius: 16, background: "rgba(232,80,42,.07)" }}
               >
                 <div className="sec-label" style={{ letterSpacing: 0.6, marginBottom: 8 }}>
                   Nostr private key
@@ -360,7 +360,7 @@ export const CreateSheet = ({
             className="btn-dark press"
             disabled={!canCreate}
             style={{
-              marginTop: 22,
+              marginTop: 20,
               border: 0,
               opacity: canCreate ? 1 : 0.4,
               ["--press" as string]: 0.97,

@@ -118,7 +118,7 @@ export const AddContactSheet = ({
       </div>
       {profile === null ? (
         <>
-          <div style={{ marginTop: 22 }}>
+          <div style={{ marginTop: 20 }}>
             <label className="sec-label" htmlFor="profile-link" style={{ display: "block" }}>
               Profile link or public key
             </label>
@@ -139,7 +139,7 @@ export const AddContactSheet = ({
             />
           </div>
           {directPublicKey !== null && (
-            <div style={{ marginTop: 14 }}>
+            <div style={{ marginTop: 12 }}>
               <label className="sec-label" htmlFor="public-key-display-name">
                 Display name
               </label>
@@ -201,7 +201,7 @@ export const AddContactSheet = ({
             <div
               data-testid="add-contact-verifying"
               className="sheet-note"
-              style={{ marginTop: 18 }}
+              style={{ marginTop: 16 }}
             >
               Checking the profile details…
             </div>
@@ -211,8 +211,8 @@ export const AddContactSheet = ({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 14,
-              marginTop: 22,
+              gap: 16,
+              marginTop: 20,
               padding: 16,
               borderRadius: 20,
               background: "var(--kc-surface)",
@@ -282,7 +282,7 @@ export const AddContactSheet = ({
               {error}
             </div>
           )}
-          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+          <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
             <button
               type="button"
               data-testid="add-contact-use-another"
@@ -297,7 +297,7 @@ export const AddContactSheet = ({
                 flex: 1,
                 border: 0,
                 borderRadius: 16,
-                padding: 15,
+                padding: 16,
                 background: "var(--kc-surface-raised)",
                 color: "var(--kc-text)",
                 fontWeight: 800,

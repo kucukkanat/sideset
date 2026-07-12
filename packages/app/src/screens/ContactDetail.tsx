@@ -60,7 +60,6 @@ export const ContactDetail = ({
     setConfirmingRemoval(false);
     requestAnimationFrame(() => removeButtonRef.current?.focus());
   };
-
   return (
     <div
       data-testid={`screen-contact-detail-${contact.id}`}
@@ -79,7 +78,7 @@ export const ContactDetail = ({
         }}
       >
         <div className="hero-sheen" />
-        <div className="contact-detail-hero-actions">
+        <div className="detail-hero-actions">
           <button
             data-testid="contact-detail-back"
             type="button"

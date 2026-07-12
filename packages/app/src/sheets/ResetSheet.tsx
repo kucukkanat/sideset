@@ -16,7 +16,7 @@ export const ResetSheet = ({ onReset }: { onReset: () => void }): ReactElement =
         color: "var(--kc-warning-text)",
         borderRadius: 14,
         padding: "13px 15px",
-        marginTop: 22,
+        marginTop: 20,
         fontSize: 12.5,
         fontWeight: 700,
         lineHeight: 1.45,

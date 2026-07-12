@@ -120,7 +120,7 @@ export const ConnectAccountSheet = ({
             <div className="sheet-title">Connect an account</div>
             <div className="sheet-lead">Choose a service to link with {card.name}.</div>
           </div>
-          <div className="panel" style={{ marginTop: 22 }}>
+          <div className="panel" style={{ marginTop: 20 }}>
             {PROOF_ORDER.map((provider) => {
               const meta = PROVIDER_META[provider];
               const available = availableProviders.includes(provider);
@@ -167,7 +167,7 @@ export const ConnectAccountSheet = ({
               );
             })}
           </div>
-          <div className="sheet-note" style={{ marginTop: 14 }}>
+          <div className="sheet-note" style={{ marginTop: 12 }}>
             GitHub can be checked directly from this app. Other services need a secure sign-in
             service and are coming soon.
           </div>
@@ -182,7 +182,7 @@ export const ConnectAccountSheet = ({
               Create a verification code, add it to your public GitHub bio, then check it here.
             </div>
           </div>
-          <div style={{ marginTop: 22 }}>
+          <div style={{ marginTop: 20 }}>
             <div className="sec-label" style={{ marginBottom: 8 }}>
               GitHub username
             </div>
@@ -208,7 +208,7 @@ export const ConnectAccountSheet = ({
                 data-testid="connect-github-code"
                 style={{
                   marginTop: 16,
-                  padding: 14,
+                  padding: 16,
                   borderRadius: 16,
                   background: "var(--kc-surface-raised)",
                   border: "1px solid var(--kc-border)",
@@ -259,7 +259,7 @@ export const ConnectAccountSheet = ({
                 className="btn-light press"
                 style={{
                   display: "block",
-                  marginTop: 14,
+                  marginTop: 12,
                   textAlign: "center",
                   textDecoration: "none",
                 }}
@@ -281,7 +281,7 @@ export const ConnectAccountSheet = ({
             className="btn-dark press"
             disabled={step === "checking"}
             onClick={() => void (verificationCode === null ? createCode() : checkGithub())}
-            style={{ marginTop: 14, opacity: step === "checking" ? 0.55 : 1 }}
+            style={{ marginTop: 12, opacity: step === "checking" ? 0.55 : 1 }}
           >
             {step === "checking"
               ? "Checking profile…"

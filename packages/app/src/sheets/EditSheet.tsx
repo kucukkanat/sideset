@@ -62,7 +62,7 @@ export const EditSheet = ({
         style={{
           display: "flex",
           justifyContent: "center",
-          gap: 9,
+          gap: 8,
           marginTop: 16,
           flexWrap: "wrap",
         }}
@@ -126,7 +126,7 @@ export const EditSheet = ({
           data-testid="edit-card-name"
           className="input"
           maxLength={50}
-          style={{ padding: 15 }}
+          style={{ padding: 16 }}
           value={name}
           onInput={(e) => setName(e.currentTarget.value)}
         />
@@ -139,7 +139,7 @@ export const EditSheet = ({
           data-testid="edit-card-username"
           className="input"
           maxLength={80}
-          style={{ padding: 15 }}
+          style={{ padding: 16 }}
           value={username}
           onInput={(event) => setUsername(event.currentTarget.value)}
         />
@@ -153,7 +153,7 @@ export const EditSheet = ({
           className="input"
           type="email"
           maxLength={254}
-          style={{ padding: 15 }}
+          style={{ padding: 16 }}
           value={email}
           onInput={(event) => setEmail(event.currentTarget.value)}
         />
@@ -168,7 +168,7 @@ export const EditSheet = ({
           maxLength={280}
           rows={3}
           style={{
-            padding: 15,
+            padding: 16,
             fontSize: 15,
             fontWeight: 600,
             resize: "none",
@@ -182,7 +182,7 @@ export const EditSheet = ({
         type="submit"
         data-testid="edit-card-save"
         className="btn-dark press"
-        style={{ marginTop: 22, border: 0, ["--press" as string]: 0.97 }}
+        style={{ marginTop: 20, border: 0, ["--press" as string]: 0.97 }}
       >
         Save changes
       </button>

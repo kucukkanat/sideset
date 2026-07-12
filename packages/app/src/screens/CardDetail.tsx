@@ -106,15 +106,7 @@ export const CardDetail = ({
         }}
       >
         <div className="hero-sheen" />
-        <div
-          style={{
-            position: "relative",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            zIndex: 2,
-          }}
-        >
+        <div className="detail-hero-actions">
           <button
             data-testid="card-detail-back"
             type="button"
@@ -144,17 +136,17 @@ export const CardDetail = ({
         </div>
       </div>
 
-      <div data-testid="card-detail-profile" style={{ padding: "20px 24px 0" }}>
-        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Profile</div>
+      <div data-testid="card-detail-profile" className="detail-section">
+        <div className="detail-section-heading">Profile</div>
         <div className="panel">
-          <div className="row" style={{ padding: "13px 16px" }}>
+          <div className="row">
             <div className="row-body">
               <div className="row-title ellip">@{card.username}</div>
               <div className="row-sub">Username</div>
             </div>
           </div>
           {card.email && (
-            <div className="row" style={{ padding: "13px 16px" }}>
+            <div className="row">
               <div className="row-body">
                 <div className="row-title ellip">{card.email}</div>
                 <div className="row-sub">Email</div>
@@ -164,23 +156,9 @@ export const CardDetail = ({
         </div>
       </div>
 
-      <div style={{ padding: "18px 24px 4px" }}>
+      <div className="detail-control-section">
         {isActive ? (
-          <div
-            data-testid="card-detail-activate"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              background: "#E9F7EC",
-              color: "#1E8A4C",
-              borderRadius: 16,
-              padding: 14,
-              fontSize: 14,
-              fontWeight: 800,
-            }}
-          >
+          <div data-testid="card-detail-activate" className="detail-active-state">
             <span
               style={{
                 width: 8,
@@ -209,14 +187,7 @@ export const CardDetail = ({
         )}
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr",
-          gap: 10,
-          padding: "12px 24px 4px",
-        }}
-      >
+      <div className="detail-control-section detail-action-grid">
         <div
           data-testid="card-detail-share"
           role="button"
@@ -230,8 +201,8 @@ export const CardDetail = ({
         </div>
       </div>
 
-      <div data-testid="card-detail-accounts" style={{ padding: "22px 24px 0" }}>
-        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Connected accounts</div>
+      <div data-testid="card-detail-accounts" className="detail-section">
+        <div className="detail-section-heading">Connected accounts</div>
         <div className="panel">
           {(card.proofs ?? []).map((proof) => {
             const meta = PROVIDER_META[proof.provider];
@@ -240,7 +211,6 @@ export const CardDetail = ({
                 data-testid={`card-account-${proof.provider}`}
                 key={proof.provider}
                 className="row"
-                style={{ padding: "13px 16px" }}
               >
                 <div className="row-icon" style={{ background: meta.bg }}>
                   <ProviderIcon provider={proof.provider} />

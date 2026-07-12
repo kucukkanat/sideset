@@ -21,7 +21,7 @@ export const HelpSheet = (): ReactElement => (
       <div className="sheet-title">Help & support</div>
       <div className="sheet-lead">Quick answers about this preview.</div>
     </div>
-    <div className="panel" style={{ marginTop: 22 }}>
+    <div className="panel" style={{ marginTop: 20 }}>
       {HELP.map((item) => (
         <section
           data-testid={`help-item-${item.title.toLowerCase().replaceAll(" ", "-")}`}

@@ -126,7 +126,7 @@ export const RestoreSheet = ({
         <fieldset style={{ border: 0, padding: 0, marginTop: 20 }}>
           <legend className="sec-label">Identities</legend>
           {preview.cards.map((card) => (
-            <label key={card.id} style={{ display: "flex", gap: 10, padding: "9px 0" }}>
+            <label key={card.id} style={{ display: "flex", gap: 12, padding: "8px 0" }}>
               <input
                 data-testid={`restore-card-${card.id}`}
                 type="checkbox"
@@ -144,7 +144,7 @@ export const RestoreSheet = ({
             </label>
           ))}
           {preview.settings && (
-            <label style={{ display: "flex", gap: 10, padding: "9px 0" }}>
+            <label style={{ display: "flex", gap: 12, padding: "8px 0" }}>
               <input
                 data-testid="restore-settings"
                 type="checkbox"
@@ -157,7 +157,7 @@ export const RestoreSheet = ({
             </label>
           )}
           {preview.contacts && (
-            <label style={{ display: "flex", gap: 10, padding: "9px 0" }}>
+            <label style={{ display: "flex", gap: 12, padding: "8px 0" }}>
               <input
                 data-testid="restore-contacts"
                 type="checkbox"
@@ -208,13 +208,13 @@ export const RestoreSheet = ({
       >
         <ShieldIcon size={40} width={1.8} />
       </div>
-      <div className="sheet-title" style={{ marginTop: 18 }}>
+      <div className="sheet-title" style={{ marginTop: 16 }}>
         Restore a backup
       </div>
       <div className="sheet-lead" style={{ maxWidth: 290 }}>
         Choose an encrypted Keychain backup and enter the password used to create it.
       </div>
-      <div style={{ width: "100%", marginTop: 22, textAlign: "left" }}>
+      <div style={{ width: "100%", marginTop: 20, textAlign: "left" }}>
         <label className="sec-label" htmlFor="backup-file" style={{ display: "block" }}>
           Backup file
         </label>
@@ -275,7 +275,7 @@ export const RestoreSheet = ({
         className="btn-dark press"
         disabled={step === "restoring" || file === null || password.length === 0}
         style={{
-          marginTop: 22,
+          marginTop: 20,
           border: 0,
           opacity: step === "restoring" || file === null || password.length === 0 ? 0.45 : 1,
           ["--press" as string]: 0.97,

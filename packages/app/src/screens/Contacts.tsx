@@ -8,7 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { ActionButton } from "../components/ActionButton.tsx";
 import { CardAvatar } from "../components/CardAvatar.tsx";
+import { ScreenHeader } from "../components/ScreenHeader.tsx";
 import { ChevronIcon, PlusIcon, SearchIcon, TrashIcon } from "../icons.tsx";
 
 interface ContactsProps {
@@ -129,43 +131,41 @@ export const Contacts = ({
         aria-hidden={confirmingRemoval || undefined}
         inert={confirmingRemoval || undefined}
       >
-        <header className="contacts-header">
-          <div>
-            <div className="hdr-sub">Your private address book</div>
-            <h1 className="hdr-title">People</h1>
-          </div>
-          <div className="contacts-header-actions">
-            {contacts.length > 0 && (
-              <button
-                ref={manageButtonRef}
-                data-testid="contacts-manage"
-                type="button"
-                className="contact-toolbar-button press"
-                aria-pressed={managing}
-                aria-controls="contacts-list"
-                onClick={() => {
-                  if (managing) finishManaging();
-                  else setManaging(true);
-                }}
-              >
-                {managing ? "Done" : "Manage"}
-              </button>
-            )}
-            {!managing && contacts.length > 0 && (
-              <button
-                data-testid="contacts-import-profile"
-                type="button"
-                className="contact-add-button press"
-                onClick={onImport}
-              >
-                <span aria-hidden="true">
-                  <PlusIcon size={18} width={2.5} />
-                </span>
-                Add
-              </button>
-            )}
-          </div>
-        </header>
+        <ScreenHeader
+          title="People"
+          subtitle="Your private address book"
+          actions={
+            <>
+              {contacts.length > 0 && (
+                <ActionButton
+                  ref={manageButtonRef}
+                  data-testid="contacts-manage"
+                  type="button"
+                  aria-pressed={managing}
+                  aria-controls="contacts-list"
+                  onClick={() => {
+                    if (managing) finishManaging();
+                    else setManaging(true);
+                  }}
+                >
+                  {managing ? "Done" : "Manage"}
+                </ActionButton>
+              )}
+              {!managing && contacts.length > 0 && (
+                <ActionButton
+                  data-testid="contacts-import-profile"
+                  variant="primary"
+                  onClick={onImport}
+                >
+                  <span aria-hidden="true">
+                    <PlusIcon size={18} width={2.5} />
+                  </span>
+                  Add
+                </ActionButton>
+              )}
+            </>
+          }
+        />
 
         <div className="contacts-search-wrap">
           <span aria-hidden="true">
@@ -206,14 +206,14 @@ export const Contacts = ({
             </div>
             <h2>No contacts yet</h2>
             <p>Add a profile link or public key to start your private address book.</p>
-            <button
+            <ActionButton
               data-testid="contacts-empty-add"
-              type="button"
-              className="btn-dark press"
+              variant="primary"
+              className="app-action-block"
               onClick={onImport}
             >
               Add your first contact
-            </button>
+            </ActionButton>
           </div>
         ) : visibleContacts.length === 0 ? (
           <div data-testid="contacts-no-results" className="contacts-empty">
@@ -222,14 +222,9 @@ export const Contacts = ({
             </div>
             <h2>No matching people</h2>
             <p>Try a name, handle, connected account, or public key.</p>
-            <button
-              data-testid="contacts-clear-search"
-              type="button"
-              className="contact-toolbar-button press"
-              onClick={() => onQueryChange("")}
-            >
+            <ActionButton data-testid="contacts-clear-search" onClick={() => onQueryChange("")}>
               Clear search
-            </button>
+            </ActionButton>
           </div>
         ) : (
           <ul id="contacts-list" data-testid="contacts-list" className="contacts-list">

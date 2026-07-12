@@ -14,6 +14,7 @@ import {
 import type { ReactElement } from "react";
 import { CardAvatar } from "../components/CardAvatar.tsx";
 import { ComingSoon } from "../components/ComingSoon.tsx";
+import { ScreenHeader } from "../components/ScreenHeader.tsx";
 import { ChevronIcon } from "../icons.tsx";
 
 export type ThemePreference = "light" | "dark" | "system";
@@ -157,42 +158,22 @@ export const Settings = ({
 
   return (
     <div data-testid="screen-settings" className="scr screen">
-      <div style={{ padding: "8px 24px 18px" }}>
-        <div className="hdr-title" style={{ marginTop: 0 }}>
-          Settings
-        </div>
-      </div>
-      <div style={{ padding: "0 24px 20px" }}>
+      <ScreenHeader title="Settings" subtitle="Privacy, backups, and preferences" />
+      <div className="app-page-content">
         <button
           data-testid="settings-active-card"
           data-theme-surface="card"
           type="button"
-          className="press"
+          className="settings-card press"
           onClick={onOpenActiveCard}
           style={{
-            width: "100%",
-            border: "none",
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            background: "var(--kc-surface)",
-            borderRadius: 20,
-            padding: 16,
-            boxShadow: "0 4px 14px -8px rgba(80,50,20,.2)",
-            textAlign: "left",
             ["--press" as string]: 0.98,
           }}
         >
           <div
+            className="settings-card-avatar"
             style={{
-              width: 54,
-              height: 54,
-              borderRadius: 16,
               background: pal.grad,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 26,
               boxShadow: `0 6px 14px -6px ${pal.shadow}`,
             }}
           >
@@ -214,7 +195,7 @@ export const Settings = ({
         <div
           data-testid={`settings-group-${group.title.toLowerCase()}`}
           key={group.title}
-          style={{ padding: "0 24px 20px" }}
+          className="app-page-content"
         >
           <div
             data-testid={`settings-group-${group.title.toLowerCase()}-label`}
@@ -251,10 +232,6 @@ export const Settings = ({
                     style={{
                       background: row.bg,
                       color: row.fg,
-                      width: 34,
-                      height: 34,
-                      borderRadius: 10,
-                      fontSize: 17,
                     }}
                   >
                     <Icon aria-hidden="true" size={18} strokeWidth={2.1} />
@@ -287,12 +264,12 @@ export const Settings = ({
         </div>
       ))}
       <div
+        className="app-page-footer"
         style={{
           textAlign: "center",
           fontSize: 12,
           fontWeight: 600,
           color: "var(--kc-faint)",
-          padding: "4px 24px 10px",
         }}
       >
         Keychain · Version 1.0

@@ -59,7 +59,7 @@ export const ShareSheet = ({
       </div>
       <div
         style={{
-          marginTop: 22,
+          marginTop: 20,
           padding: 12,
           background: "#fff",
           borderRadius: 26,
@@ -91,7 +91,7 @@ export const ShareSheet = ({
       >
         @{subject.handle.replace(/^@/u, "")}
       </div>
-      <div style={{ display: "flex", gap: 10, marginTop: 18, width: "100%" }}>
+      <div style={{ display: "flex", gap: 12, marginTop: 16, width: "100%" }}>
         <button
           type="button"
           data-testid="share-copy-link"
@@ -102,7 +102,7 @@ export const ShareSheet = ({
             border: 0,
             background: "var(--kc-surface-raised)",
             borderRadius: 16,
-            padding: 15,
+            padding: 16,
             fontSize: 14,
             fontWeight: 800,
             color: "var(--kc-text)",
@@ -122,7 +122,7 @@ export const ShareSheet = ({
             background: "#1B1917",
             color: "#fff",
             borderRadius: 16,
-            padding: 15,
+            padding: 16,
             fontSize: 14,
             fontWeight: 800,
             ["--press" as string]: 0.96,

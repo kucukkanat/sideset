@@ -14,7 +14,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { type ChangeEvent, type ReactElement, useMemo, useState } from "react";
+import { ActionButton } from "../components/ActionButton.tsx";
 import { CloakTool } from "../components/CloakTool.tsx";
+import { ScreenHeader } from "../components/ScreenHeader.tsx";
 import { nostrPublicKey, nostrPublicKeyHex } from "../nostrKeys.ts";
 import type { ToolOperation } from "../routing.ts";
 import { copyText } from "../sharing.ts";
@@ -180,15 +182,11 @@ export const Tools = ({
 
   return (
     <div data-testid="screen-tools" className="scr screen">
-      <div style={{ padding: "8px 24px 18px" }}>
-        <div className="hdr-title" style={{ marginTop: 0 }}>
-          Tools
-        </div>
-        <div className="hdr-sub">
-          Encrypt, decrypt, cloak, sign, and verify—right on this device
-        </div>
-      </div>
-      <div style={{ padding: "0 24px 120px", display: "grid", gap: 16 }}>
+      <ScreenHeader
+        title="Tools"
+        subtitle="Encrypt, decrypt, cloak, sign, and verify—right on this device"
+      />
+      <div className="app-page-content app-page-stack">
         <div className="tools-segments" role="group" aria-label="Tool operation">
           {(["encrypt", "decrypt", "sign", "verify", "cloak"] as const).map((item) => {
             const Icon = OPERATION_ICONS[item];
@@ -357,29 +355,15 @@ export const Tools = ({
           </div>
         )}
         {operation !== "cloak" && (
-          <button
+          <ActionButton
             data-testid="tools-run"
-            type="button"
-            className="press"
+            variant="primary"
+            className="tools-run-action"
             onClick={() => void run()}
-            style={{
-              border: 0,
-              borderRadius: 16,
-              padding: 15,
-              background: "#E8502A",
-              color: "#fff",
-              font: "inherit",
-              fontWeight: 800,
-              textTransform: "capitalize",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-            }}
           >
             <OperationIcon aria-hidden="true" size={19} />
             {operation}
-          </button>
+          </ActionButton>
         )}
         {operation === "verify" &&
           verification !== null &&

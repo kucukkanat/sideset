@@ -799,7 +799,6 @@ export const App = (): ReactElement => {
             hideFrontCard={flip?.dir === "rev" && flip.kind === "card"}
             frontCardRef={frontCardRef}
             onOpenDetail={openDetailFlip}
-            onImport={() => push({ page: "people", sheet: "add" })}
             onCreate={() =>
               push({
                 page: "wallet",

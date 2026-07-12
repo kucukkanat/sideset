@@ -1,5 +1,12 @@
 import { type Card, PROVIDER_META, type ProviderId, paletteFor } from "@keychain/core";
-import type { ReactElement, RefObject } from "react";
+import {
+  type KeyboardEvent,
+  type ReactElement,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { CardAvatar } from "../components/CardAvatar.tsx";
 import {
   BackIcon,
@@ -23,6 +30,7 @@ interface CardDetailProps {
   onBackup: () => void;
   onActivate: () => void;
   onCopyPublicKey: (publicKey: string) => void;
+  onCopyPrivateKey: (privateKey: string) => void;
   onDisconnectAccount: (provider: ProviderId) => void;
   onConnectAccount: () => void;
 }
@@ -38,11 +46,48 @@ export const CardDetail = ({
   onBackup,
   onActivate,
   onCopyPublicKey,
+  onCopyPrivateKey,
   onDisconnectAccount,
   onConnectAccount,
 }: CardDetailProps): ReactElement => {
   const pal = paletteFor(card.color);
   const identity = card.identity;
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
+  const [isHoldingVault, setIsHoldingVault] = useState(false);
+  const [isCopyArmed, setIsCopyArmed] = useState(false);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const sealTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const cancelHold = (): void => {
+    clearTimeout(holdTimer.current);
+    setIsHoldingVault(false);
+  };
+  const sealVault = (): void => {
+    clearTimeout(sealTimer.current);
+    setIsVaultOpen(false);
+    setIsCopyArmed(false);
+  };
+  const beginHold = (): void => {
+    if (isVaultOpen || isHoldingVault) return;
+    setIsHoldingVault(true);
+    holdTimer.current = setTimeout(() => {
+      setIsHoldingVault(false);
+      setIsVaultOpen(true);
+      sealTimer.current = setTimeout(sealVault, 30_000);
+    }, 1_200);
+  };
+  const handleVaultKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
+    if ((event.key === "Enter" || event.key === " ") && !event.repeat) beginHold();
+  };
+  const handleVaultKeyUp = (event: KeyboardEvent<HTMLButtonElement>): void => {
+    if (event.key === "Enter" || event.key === " ") cancelHold();
+  };
+  useEffect(
+    () => () => {
+      clearTimeout(holdTimer.current);
+      clearTimeout(sealTimer.current);
+    },
+    [],
+  );
   return (
     <div
       data-testid={`screen-card-detail-${card.id}`}
@@ -194,59 +239,6 @@ export const CardDetail = ({
         </div>
       </div>
 
-      {identity !== undefined && (
-        <div data-testid="card-detail-public-key" style={{ padding: "20px 24px 0" }}>
-          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Public key</div>
-          <button
-            data-testid="card-detail-copy-public-key"
-            data-theme-surface="card"
-            type="button"
-            aria-label={`Copy ${card.name}'s public key`}
-            className="press"
-            onClick={() => onCopyPublicKey(identity.publicKey)}
-            style={{
-              width: "100%",
-              border: "none",
-              display: "flex",
-              alignItems: "center",
-              gap: 13,
-              background: "var(--kc-surface)",
-              borderRadius: 18,
-              padding: "15px 16px",
-              boxShadow: "0 4px 14px -8px rgba(80,50,20,.2)",
-              textAlign: "left",
-              ["--press" as string]: 0.98,
-            }}
-          >
-            <div className="row-icon" style={{ background: "#EFEAF7" }}>
-              🔑
-            </div>
-            <div className="row-body">
-              <code
-                style={{
-                  display: "block",
-                  color: "var(--kc-text)",
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {identity.publicKey}
-              </code>
-              <div
-                data-theme-text="muted"
-                style={{ fontSize: 11.5, fontWeight: 600, color: "var(--kc-subtle)", marginTop: 2 }}
-              >
-                Tap to copy
-              </div>
-            </div>
-            <CopyIcon />
-          </button>
-        </div>
-      )}
-
       <div data-testid="card-detail-accounts" style={{ padding: "22px 24px 0" }}>
         <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Connected accounts</div>
         <div className="panel">
@@ -303,7 +295,10 @@ export const CardDetail = ({
               cursor: "pointer",
             }}
           >
-            <div className="row-icon" style={{ background: "#EFE7DB" }}>
+            <div
+              className="row-icon"
+              style={{ color: "var(--kc-text)", background: "var(--kc-surface-raised)" }}
+            >
               <PlusIcon size={20} />
             </div>
             <div
@@ -315,6 +310,113 @@ export const CardDetail = ({
           </button>
         </div>
       </div>
+
+      {identity !== undefined && (
+        <section data-testid="card-detail-keys" className="card-keys">
+          <div className="card-keys-heading">
+            <div>
+              <div className="card-keys-title">Keys</div>
+              <div className="card-keys-subtitle">Your identity, under your control.</div>
+            </div>
+            <div className="card-keys-shield" aria-hidden="true">
+              <ShieldIcon />
+            </div>
+          </div>
+
+          <button
+            data-testid="card-detail-copy-public-key"
+            type="button"
+            aria-label={`Copy ${card.name}'s public key`}
+            className="card-key-row press"
+            onClick={() => onCopyPublicKey(identity.publicKey)}
+          >
+            <div className="card-key-kind">Public key</div>
+            <code>{identity.publicKey}</code>
+            <div className="card-key-action">
+              Safe to share <CopyIcon />
+            </div>
+          </button>
+
+          <div className={`key-vault${isVaultOpen ? " is-open" : ""}`}>
+            <div className="key-vault-topline">
+              <div>
+                <div className="card-key-kind">Private key</div>
+                <div className="key-vault-warning">Anyone with this key can become you.</div>
+              </div>
+              <div className="key-vault-status">{isVaultOpen ? "Vault open" : "Sealed"}</div>
+            </div>
+
+            {isVaultOpen ? (
+              <>
+                <code data-testid="card-detail-private-key" className="key-vault-secret">
+                  {identity.privateKey}
+                </code>
+                <div className="key-vault-timer">Auto-seals in 30 seconds</div>
+                <div className="key-vault-actions">
+                  <button
+                    data-testid="card-detail-seal-private-key"
+                    type="button"
+                    className="key-vault-secondary press"
+                    onClick={sealVault}
+                  >
+                    Seal now
+                  </button>
+                  {isCopyArmed ? (
+                    <button
+                      data-testid="card-detail-confirm-copy-private-key"
+                      type="button"
+                      className="key-vault-copy press"
+                      onClick={() => {
+                        onCopyPrivateKey(identity.privateKey);
+                        sealVault();
+                      }}
+                    >
+                      <CopyIcon /> Copy &amp; seal
+                    </button>
+                  ) : (
+                    <button
+                      data-testid="card-detail-arm-copy-private-key"
+                      type="button"
+                      className="key-vault-copy press"
+                      onClick={() => setIsCopyArmed(true)}
+                    >
+                      Arm copy
+                    </button>
+                  )}
+                </div>
+                {isCopyArmed && (
+                  <div className="key-vault-confirmation">
+                    Final check: nobody else can see your screen.
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="key-vault-concealed" aria-hidden="true">
+                  •••• •••• •••• ••••
+                </div>
+                <button
+                  data-testid="card-detail-reveal-private-key"
+                  type="button"
+                  className="key-vault-hold"
+                  data-holding={isHoldingVault}
+                  onPointerDown={beginHold}
+                  onPointerUp={cancelHold}
+                  onPointerCancel={cancelHold}
+                  onPointerLeave={cancelHold}
+                  onKeyDown={handleVaultKeyDown}
+                  onKeyUp={handleVaultKeyUp}
+                >
+                  <span className="key-vault-hold-fill" />
+                  <span className="key-vault-hold-label">
+                    {isHoldingVault ? "Keep holding…" : "Hold to open vault"}
+                  </span>
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 };

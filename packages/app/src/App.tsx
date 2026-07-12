@@ -403,7 +403,11 @@ export const App = (): ReactElement => {
       withActivity(
         { ...state, cards: [...state.cards, card], activeId: card.id },
         createActivity(
-          { kind: "emoji", emoji: card.avatar || "🙂", bg: "#E9F7EC" },
+          {
+            kind: "emoji",
+            emoji: card.avatar.startsWith("data:image/") ? "🙂" : card.avatar || "🙂",
+            bg: "#E9F7EC",
+          },
           `Created ${card.name} card`,
           "A separate profile",
         ),
@@ -430,7 +434,11 @@ export const App = (): ReactElement => {
       withActivity(
         { ...state, cards: updateCard(state.cards, detail.id, { ...patch, name }) },
         createActivity(
-          { kind: "emoji", emoji: patch.avatar || "🙂", bg: "#FCEDE7" },
+          {
+            kind: "emoji",
+            emoji: patch.avatar.startsWith("data:image/") ? "🙂" : patch.avatar || "🙂",
+            bg: "#FCEDE7",
+          },
           `Updated ${name}`,
           "Card details changed",
         ),
@@ -600,6 +608,13 @@ export const App = (): ReactElement => {
   const copyPublicKey = async (publicKey: string): Promise<void> => {
     const result = await copyText(publicKey);
     showToast(result.ok ? "Public key copied" : "Clipboard access isn’t available");
+  };
+
+  const copyPrivateKey = async (privateKey: string): Promise<void> => {
+    const result = await copyText(privateKey);
+    showToast(
+      result.ok ? "Private key copied — keep it secret" : "Clipboard access isn’t available",
+    );
   };
 
   const shareContact = async (person: Contact, url: string): Promise<void> => {
@@ -804,6 +819,7 @@ export const App = (): ReactElement => {
             onBackup={() => push({ page: "card", cardId: detail.id, sheet: "backup" })}
             onActivate={() => activate(detail)}
             onCopyPublicKey={(publicKey) => void copyPublicKey(publicKey)}
+            onCopyPrivateKey={(privateKey) => void copyPrivateKey(privateKey)}
             onDisconnectAccount={disconnectAccount}
             onConnectAccount={() => connectAccount(detail.id)}
           />
@@ -864,7 +880,7 @@ export const App = (): ReactElement => {
               <ShareSheet card={detail} shareUrl={shareUrlFor(detail)} onToast={showToast} />
             )}
             {route.page === "card" && detail !== undefined && route.sheet === "edit" && (
-              <EditSheet card={detail} onSave={saveEdit} />
+              <EditSheet card={detail} onSave={saveEdit} onToast={showToast} />
             )}
             {route.page === "person" && contact !== undefined && route.sheet === "edit" && (
               <EditContactSheet contact={contact} onCancel={closeOverlay} onSave={saveContact} />

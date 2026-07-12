@@ -167,7 +167,8 @@ export const CreateSheet = ({
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                background: "#F2EBE0",
+                color: "var(--kc-text)",
+                background: "var(--kc-surface-raised)",
               }}
             >
               <Upload aria-hidden="true" size={20} />

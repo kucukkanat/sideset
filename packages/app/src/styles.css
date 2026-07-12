@@ -851,6 +851,201 @@ a:focus-visible,
   font-weight: 700;
 }
 
+.card-keys {
+  padding: 24px 24px 0;
+}
+.card-keys-heading,
+.key-vault-topline,
+.key-vault-actions,
+.card-key-action {
+  display: flex;
+  align-items: center;
+}
+.card-keys-heading,
+.key-vault-topline {
+  justify-content: space-between;
+}
+.card-keys-title {
+  color: var(--kc-heading);
+  font-size: 18px;
+  font-weight: 850;
+}
+.card-keys-subtitle,
+.key-vault-warning,
+.key-vault-timer {
+  color: var(--kc-muted);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+.card-keys-subtitle {
+  margin-top: 2px;
+}
+.card-keys-shield {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--kc-accent);
+  background: color-mix(in srgb, var(--kc-accent) 10%, var(--kc-surface));
+}
+.card-key-row,
+.key-vault {
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid var(--kc-border);
+  border-radius: 18px;
+  background: var(--kc-surface);
+  box-shadow: 0 5px 16px -11px rgba(80, 50, 20, 0.35);
+}
+.card-key-row {
+  padding: 15px 16px;
+  color: var(--kc-text);
+  text-align: left;
+}
+.card-key-kind {
+  color: var(--kc-text);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.25px;
+}
+.card-key-row code,
+.key-vault-secret {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  overflow: hidden;
+  color: var(--kc-text);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-key-action {
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--kc-accent);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.key-vault {
+  position: relative;
+  overflow: hidden;
+  padding: 16px;
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s;
+}
+.key-vault.is-open {
+  border-color: color-mix(in srgb, var(--kc-accent) 48%, var(--kc-border));
+  box-shadow: 0 10px 28px -16px color-mix(in srgb, var(--kc-accent) 45%, transparent);
+}
+.key-vault-status {
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: var(--kc-muted);
+  background: var(--kc-surface-raised);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+}
+.key-vault.is-open .key-vault-status {
+  color: var(--kc-accent);
+  background: color-mix(in srgb, var(--kc-accent) 10%, var(--kc-surface));
+}
+.key-vault-concealed {
+  margin-top: 14px;
+  color: var(--kc-faint);
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-align: center;
+}
+.key-vault-hold {
+  position: relative;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 13px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--kc-accent) 35%, var(--kc-border));
+  border-radius: 13px;
+  color: var(--kc-accent);
+  background: color-mix(in srgb, var(--kc-accent) 7%, var(--kc-surface));
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 850;
+  touch-action: none;
+  user-select: none;
+}
+.key-vault-hold-fill {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--kc-accent) 16%, transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.key-vault-hold[data-holding="true"] .key-vault-hold-fill {
+  animation: vaultUnlock 1.2s linear forwards;
+}
+.key-vault-hold-label {
+  position: relative;
+}
+.key-vault-secret {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 11px;
+  background: var(--kc-surface-raised);
+  text-overflow: initial;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.key-vault-timer {
+  margin-top: 7px;
+  text-align: center;
+}
+.key-vault-actions {
+  gap: 8px;
+  margin-top: 13px;
+}
+.key-vault-actions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 12px;
+  font-size: 12.5px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.key-vault-secondary {
+  flex: 0.8;
+  color: var(--kc-muted);
+  background: var(--kc-surface-raised);
+}
+.key-vault-copy {
+  display: flex;
+  flex: 1.2;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #fff;
+  background: var(--kc-accent);
+}
+.key-vault-confirmation {
+  margin-top: 9px;
+  color: var(--kc-warning-text);
+  font-size: 11px;
+  font-weight: 750;
+  text-align: center;
+}
+@keyframes vaultUnlock {
+  to {
+    transform: scaleX(1);
+  }
+}
+
 /* Contact directory */
 .contacts-screen {
   background:

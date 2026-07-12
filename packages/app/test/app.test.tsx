@@ -284,7 +284,9 @@ describe("honest client-only wallet", () => {
     await mount();
 
     expect(byTestId("create-card-avatar-random")).toBeDefined();
-    expect(byTestId("create-card-avatar-upload")).toBeDefined();
+    const avatarUpload = byTestId("create-card-avatar-upload");
+    expect(avatarUpload.parentElement?.style.color).toBe("var(--kc-text)");
+    expect(avatarUpload.parentElement?.style.background).toBe("var(--kc-surface-raised)");
     expect(document.querySelectorAll('[data-testid^="create-card-avatar-"]').length).toBe(2);
   });
 
@@ -318,6 +320,14 @@ describe("honest client-only wallet", () => {
     expect(bodyText()).not.toMatch(
       /\bnostr\b|\brelay\b|\bproofs?\b|provably|public key|\bnpub\w*|\bsats\b/iu,
     );
+  });
+
+  test("uses contrasting theme colors for the card connect-account icon", async () => {
+    await mount("#/cards/c1");
+
+    const icon = byTestId("card-connect-account").querySelector<HTMLElement>(".row-icon");
+    expect(icon?.style.color).toBe("var(--kc-text)");
+    expect(icon?.style.background).toBe("var(--kc-surface-raised)");
   });
 
   test("exposes stable test IDs for every interactive element", async () => {
@@ -586,6 +596,38 @@ describe("honest client-only wallet", () => {
     expect(maybeByText("Public key copied")).toBeDefined();
   });
 
+  test("keeps private keys in a hold-to-open, confirm-to-copy vault", async () => {
+    const initial = createTestWalletState();
+    const card = initial.cards[0];
+    if (card === undefined) throw new Error("Initial wallet has no card");
+    const identity = await generateIdentityKeyPair();
+    expect(
+      saveWalletState({
+        ...initial,
+        cards: [{ ...card, identity }, ...initial.cards.slice(1)],
+      }),
+    ).toEqual({ ok: true });
+
+    await mount(`#/cards/${card.id}`);
+
+    const accounts = byTestId("card-detail-accounts");
+    const keys = byTestId("card-detail-keys");
+    expect(accounts.compareDocumentPosition(keys) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(document.body.textContent).not.toContain(identity.privateKey);
+
+    await pointerDown(byTestId("card-detail-reveal-private-key"));
+    await act(async () => void (await tick(1_250)));
+    expect(byTestId("card-detail-private-key").textContent).toBe(identity.privateKey);
+
+    await click(byTestId("card-detail-arm-copy-private-key"));
+    expect(await navigator.clipboard.readText()).not.toBe(identity.privateKey);
+    await click(byTestId("card-detail-confirm-copy-private-key"));
+
+    expect(await navigator.clipboard.readText()).toBe(identity.privateKey);
+    expect(maybeByText("Private key copied — keep it secret")).toBeDefined();
+    expect(maybeByTestId("card-detail-private-key")).toBeUndefined();
+  });
+
   test("runs and cleans the reverse flip after returning from card detail", async () => {
     await mount();
 
@@ -648,6 +690,38 @@ describe("honest client-only wallet", () => {
     expect(maybeByText("A locally saved profile")).toBeDefined();
     expect(maybeByTestId("card-account-twitter")).toBeUndefined();
     expect(maybeByText("@finnriver")).toBeDefined();
+  });
+
+  test("uploads a profile picture while editing a card", async () => {
+    await mount("#/cards/c1");
+    await click(buttonByLabel("Edit Everyday"));
+
+    expect(document.querySelector('[data-testid^="edit-card-avatar-"][role="button"]')).toBeNull();
+    await upload(
+      byTestId("edit-card-avatar-upload") as HTMLInputElement,
+      new File(["profile"], "profile.webp", { type: "image/webp" }),
+    );
+    await waitFor(
+      () =>
+        document
+          .querySelector<HTMLImageElement>(
+            '[data-testid="edit-card-sheet"] [data-testid="card-uploaded-avatar"]',
+          )
+          ?.src.startsWith("data:image/webp;base64,") === true,
+      "Upload not shown",
+    );
+    await click(byTestId("edit-card-save"));
+
+    await waitFor(
+      () =>
+        loadWalletState()
+          .state.cards.find((card) => card.id === "c1")
+          ?.avatar.startsWith("data:image/webp;base64,") === true,
+      "Uploaded profile picture was not saved",
+    );
+    expect(loadWalletState().state.cards.find((card) => card.id === "c1")?.avatar).toStartWith(
+      "data:image/webp;base64,",
+    );
   });
 
   test("creates and selects a persisted card in the URL", async () => {

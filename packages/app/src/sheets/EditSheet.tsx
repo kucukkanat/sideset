@@ -1,10 +1,13 @@
-import { type Card, EMOJI_CHOICES, paletteFor } from "@keychain/core";
+import { type Card, paletteFor } from "@keychain/core";
+import { Upload } from "lucide-react";
 import { type FormEvent, type ReactElement, useState } from "react";
+import { MAX_AVATAR_BYTES } from "../avatar.ts";
 import { CardAvatar } from "../components/CardAvatar.tsx";
 
 export const EditSheet = ({
   card,
   onSave,
+  onToast,
 }: {
   card: Card;
   onSave: (patch: {
@@ -14,6 +17,7 @@ export const EditSheet = ({
     bio: string;
     avatar: string;
   }) => void;
+  onToast: (message: string) => void;
 }): ReactElement => {
   const [name, setName] = useState(card.name);
   const [username, setUsername] = useState(card.username);
@@ -24,6 +28,23 @@ export const EditSheet = ({
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     onSave({ name, username, email, bio, avatar });
+  };
+  const uploadAvatar = (file: File | undefined): void => {
+    if (file === undefined) return;
+    if (!new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]).has(file.type)) {
+      onToast("Choose a JPEG, PNG, WebP, or GIF image");
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      onToast("Choose an image no larger than 4 MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") setAvatar(reader.result);
+    });
+    reader.addEventListener("error", () => onToast("Couldn't read that image"));
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -78,29 +99,35 @@ export const EditSheet = ({
         >
           Remove picture
         </button>
-        {EMOJI_CHOICES.map((emoji) => (
-          <div
-            key={emoji}
-            data-testid={`edit-card-avatar-${emoji}`}
-            role="button"
-            onClick={() => setAvatar(emoji)}
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: 13,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 21,
-              cursor: "pointer",
-              transition: "transform .15s",
-              background: avatar === emoji ? "#1B1917" : "#F2EBE0",
-              transform: `scale(${avatar === emoji ? 1.05 : 1})`,
-            }}
-          >
-            {emoji}
-          </div>
-        ))}
+        <label
+          aria-label="Upload a profile picture"
+          className="press"
+          style={{
+            minHeight: 42,
+            borderRadius: 13,
+            padding: "10px 15px",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            color: "var(--kc-text)",
+            background: "var(--kc-surface-raised)",
+            fontSize: 13,
+            fontWeight: 800,
+            cursor: "pointer",
+            ["--press" as string]: 0.97,
+          }}
+        >
+          <Upload aria-hidden="true" size={18} />
+          Upload picture
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            data-testid="edit-card-avatar-upload"
+            aria-label="Upload a profile picture"
+            onChange={(event) => uploadAvatar(event.currentTarget.files?.[0])}
+            style={{ display: "none" }}
+          />
+        </label>
       </div>
       <div style={{ marginTop: 20 }}>
         <div className="sec-label" style={{ letterSpacing: 0.6, marginBottom: 8 }}>

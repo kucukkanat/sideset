@@ -1,5 +1,6 @@
 import { type Card, PROVIDER_META, type ProviderId, paletteFor } from "@keychain/core";
 import type { ReactElement, RefObject } from "react";
+import { CardAvatar } from "../components/CardAvatar.tsx";
 import {
   BackIcon,
   CopyIcon,
@@ -89,10 +90,30 @@ export const CardDetail = ({
           </button>
         </div>
         <div className="hero-id">
-          <div className="hero-avatar">{card.avatar}</div>
+          <CardAvatar card={card} className="hero-avatar" />
           <div className="hero-name">{card.name}</div>
           <div className="hero-tag">{card.tag}</div>
           <div className="hero-bio">{card.bio || "No bio yet — tap edit to add one."}</div>
+        </div>
+      </div>
+
+      <div data-testid="card-detail-profile" style={{ padding: "20px 24px 0" }}>
+        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Profile</div>
+        <div className="panel">
+          <div className="row" style={{ padding: "13px 16px" }}>
+            <div className="row-body">
+              <div className="row-title ellip">@{card.username}</div>
+              <div className="row-sub">Username</div>
+            </div>
+          </div>
+          {card.email && (
+            <div className="row" style={{ padding: "13px 16px" }}>
+              <div className="row-body">
+                <div className="row-title ellip">{card.email}</div>
+                <div className="row-sub">Email</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -229,7 +250,7 @@ export const CardDetail = ({
       <div data-testid="card-detail-accounts" style={{ padding: "22px 24px 0" }}>
         <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Connected accounts</div>
         <div className="panel">
-          {card.proofs.map((proof) => {
+          {(card.proofs ?? []).map((proof) => {
             const meta = PROVIDER_META[proof.provider];
             return (
               <div

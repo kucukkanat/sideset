@@ -1,5 +1,5 @@
 import { passStrength, STRENGTH_COLORS, STRENGTH_LABELS } from "@keychain/core";
-import { type ReactElement, useEffect, useState } from "react";
+import { type FormEvent, type ReactElement, useEffect, useState } from "react";
 import { CheckIcon, ShieldIcon } from "../icons.tsx";
 
 export type BackupSaveResult =
@@ -55,9 +55,13 @@ export const BackupSheet = ({
     setPassword("");
     setStep("done");
   };
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    void save();
+  };
 
   return (
-    <div data-testid="backup-sheet" style={{ animation: "riseIn .4s ease" }}>
+    <form data-testid="backup-sheet" onSubmit={submit} style={{ animation: "riseIn .4s ease" }}>
       {(step === "intro" || step === "saving") && (
         <div
           style={{
@@ -181,10 +185,9 @@ export const BackupSheet = ({
             </div>
           </div>
           <button
-            type="button"
+            type="submit"
             data-testid="backup-create"
             className="btn-dark press"
-            onClick={() => void save()}
             disabled={step === "saving" || strength < 2}
             style={{
               marginTop: 20,
@@ -214,7 +217,11 @@ export const BackupSheet = ({
               className="btn-dark press"
               href={download.href}
               download={download.filename}
-              style={{ marginTop: 24, textDecoration: "none", ["--press" as string]: 0.97 }}
+              style={{
+                marginTop: 24,
+                textDecoration: "none",
+                ["--press" as string]: 0.97,
+              }}
             >
               Download backup file
             </a>
@@ -224,12 +231,17 @@ export const BackupSheet = ({
             data-testid="backup-done"
             className="press"
             onClick={onDone}
-            style={{ marginTop: 12, border: 0, background: "transparent", fontWeight: 800 }}
+            style={{
+              marginTop: 12,
+              border: 0,
+              background: "transparent",
+              fontWeight: 800,
+            }}
           >
             Done
           </button>
         </div>
       )}
-    </div>
+    </form>
   );
 };

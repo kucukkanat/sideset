@@ -1,6 +1,13 @@
 import type { Proof } from "@keychain/core";
 import { paletteFor } from "@keychain/core";
-import { type ReactElement, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   decodeSharedProfile,
   parseEd25519PublicKey,
@@ -91,9 +98,17 @@ export const AddContactSheet = ({
     const result = await onAdd(profile, verifiedProofs);
     if (!result.ok) setError(result.message);
   };
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    void (profile === null ? preview() : add());
+  };
 
   return (
-    <div data-testid="add-contact-sheet" style={{ animation: "riseIn .4s ease" }}>
+    <form
+      data-testid="add-contact-sheet"
+      onSubmit={submit}
+      style={{ animation: "riseIn .4s ease" }}
+    >
       <div style={{ textAlign: "center" }}>
         <div className="sheet-title">Add a contact</div>
         <div className="sheet-lead" style={{ maxWidth: 290, marginInline: "auto" }}>
@@ -150,16 +165,24 @@ export const AddContactSheet = ({
             <div
               role="alert"
               data-theme-text="error"
-              style={{ color: "var(--kc-error)", fontSize: 12.5, fontWeight: 700, marginTop: 10 }}
+              style={{
+                color: "var(--kc-error)",
+                fontSize: 12.5,
+                fontWeight: 700,
+                marginTop: 10,
+              }}
             >
               {error}
             </div>
           )}
           <button
-            type="button"
+            type="submit"
             data-testid="add-contact-preview"
             className="btn-dark press"
-            onClick={() => void preview()}
+            onClick={(event) => {
+              event.preventDefault();
+              void preview();
+            }}
             disabled={previewDisabled}
             style={{
               border: 0,
@@ -214,7 +237,12 @@ export const AddContactSheet = ({
               <div style={{ fontSize: 17, fontWeight: 800 }}>{profile.name}</div>
               <div
                 data-theme-text="muted"
-                style={{ color: "var(--kc-subtle)", fontSize: 13, fontWeight: 600, marginTop: 2 }}
+                style={{
+                  color: "var(--kc-subtle)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginTop: 2,
+                }}
               >
                 @{profile.handle.replace(/^@/u, "")}
               </div>
@@ -240,7 +268,12 @@ export const AddContactSheet = ({
             <div
               role="alert"
               data-theme-text="error"
-              style={{ color: "var(--kc-error)", fontSize: 12.5, fontWeight: 700, marginTop: 10 }}
+              style={{
+                color: "var(--kc-error)",
+                fontSize: 12.5,
+                fontWeight: 700,
+                marginTop: 10,
+              }}
             >
               {error}
             </div>
@@ -270,10 +303,13 @@ export const AddContactSheet = ({
               Use another
             </button>
             <button
-              type="button"
+              type="submit"
               data-testid="add-contact-save"
               className="btn-dark press"
-              onClick={() => void add()}
+              onClick={(event) => {
+                event.preventDefault();
+                void add();
+              }}
               disabled={verifying}
               style={{ flex: 1, border: 0, ["--press" as string]: 0.96 }}
             >
@@ -282,6 +318,6 @@ export const AddContactSheet = ({
           </div>
         </>
       )}
-    </div>
+    </form>
   );
 };

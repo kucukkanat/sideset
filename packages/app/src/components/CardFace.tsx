@@ -1,6 +1,7 @@
 import { type Card, paletteFor, proofsSummary } from "@keychain/core";
 import type { CSSProperties, ReactElement } from "react";
 import { PersonIcon } from "../icons.tsx";
+import { CardAvatar } from "./CardAvatar.tsx";
 
 interface CardFaceProps {
   readonly card: Card;
@@ -27,6 +28,8 @@ export const CardFace = ({
         borderRadius,
         background: palette.grad,
         overflow: "hidden",
+        userSelect: "none",
+        WebkitUserSelect: "none",
         boxShadow: `0 22px 46px -18px ${palette.shadow},0 2px 6px rgba(0,0,0,.12),0 0 0 1px rgba(255,255,255,.14) inset`,
       }}
     >
@@ -70,44 +73,69 @@ export const CardFace = ({
           flexDirection: "column",
           justifyContent: "space-between",
           color: "#fff",
+          minWidth: 0,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0, flex: 1 }}>
             <div
               style={{
-                width: 42,
-                height: 42,
-                borderRadius: 13,
+                width: 84,
+                height: 84,
+                borderRadius: 26,
                 background: "rgba(255,255,255,.22)",
                 backdropFilter: "blur(6px)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 22,
+                fontSize: 44,
                 boxShadow: "0 0 0 1px rgba(255,255,255,.25) inset",
+                flex: "0 0 auto",
               }}
             >
-              {card.avatar}
+              <CardAvatar card={card} style={{ width: "100%", height: "100%" }} />
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div
+                data-card-field="name"
                 style={{
                   fontSize: 17,
                   fontWeight: 700,
                   letterSpacing: -0.2,
                   lineHeight: 1,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {card.name}
               </div>
-              <div style={{ fontSize: 12.5, fontWeight: 500, opacity: 0.82, marginTop: 4 }}>
+              <div
+                data-card-field="tag"
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  opacity: 0.82,
+                  marginTop: 4,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {card.tag}
               </div>
             </div>
           </div>
           {active && (
             <div
+              data-card-field="proofs"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -118,6 +146,7 @@ export const CardFace = ({
                 fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: 0.2,
+                flex: "0 0 auto",
               }}
             >
               <span
@@ -133,8 +162,15 @@ export const CardFace = ({
             </div>
           )}
         </div>
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-          <div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            gap: 10,
+          }}
+        >
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div
               style={{
                 fontSize: 10,
@@ -145,8 +181,18 @@ export const CardFace = ({
             >
               CONNECTED ACCOUNTS
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.95, marginTop: 3 }}>
-              {proofsSummary(card.proofs)}
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                opacity: 0.95,
+                marginTop: 3,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {proofsSummary(card.proofs ?? [])}
             </div>
           </div>
           <PersonIcon />

@@ -7,17 +7,20 @@
   ],
   "scripts": {
     "dev": "bun run --filter @keychain/app dev",
+    "dev:site": "bun run --filter @sideset/site dev",
     "build": "bun run --filter @keychain/app build",
+    "build:site": "bun run --filter @sideset/site build",
     "preview": "bun run --filter @keychain/app preview",
-    "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p packages/app && tsc --noEmit -p packages/app/tsconfig.worker.json",
+    "preview:site": "bun run --filter @sideset/site start",
+    "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p packages/app && tsc --noEmit -p packages/app/tsconfig.worker.json && bun run --filter @sideset/branding typecheck && bun run --filter @sideset/site typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "test": "bun run test:unit && bun run test:integration",
-    "test:unit": "bun test packages/core",
-    "test:integration": "bun test packages/app",
-    "test:coverage": "bun test packages --coverage",
-    "check": "bun run typecheck && bun run lint && bun run test"
+    "test:unit": "bun test packages/core && bun run --filter @sideset/branding test:unit && bun run --filter @sideset/site test:unit",
+    "test:integration": "bun test packages/app && bun run --filter @sideset/branding test:integration && bun run --filter @sideset/site test:integration",
+    "test:coverage": "bun test packages/core packages/app --coverage && bun run --filter @sideset/branding test:coverage && bun run --filter @sideset/site test:coverage",
+    "check": "bun run typecheck && bun run lint && bun run test && bun run --filter @sideset/site test:build"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.0",

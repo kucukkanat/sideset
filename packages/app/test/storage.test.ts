@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { SEED_CARDS, SEED_CONTACTS } from "@keychain/core";
+import { createInitialActivity } from "../src/activity.ts";
 import {
   createInitialWalletState,
   decodeWalletSnapshot,
@@ -13,6 +14,14 @@ import {
 beforeEach(() => localStorage.removeItem(WALLET_STORAGE_KEY));
 afterEach(() => localStorage.removeItem(WALLET_STORAGE_KEY));
 
+const seededState = (): WalletState => ({
+  ...createInitialWalletState(),
+  cards: SEED_CARDS,
+  contacts: SEED_CONTACTS,
+  activeId: SEED_CARDS[0]?.id ?? "",
+  activity: createInitialActivity(2_000_000_000_000),
+});
+
 describe("wallet snapshot validation", () => {
   test("round-trips a valid versioned snapshot", () => {
     const state = createInitialWalletState(2_000_000_000_000);
@@ -22,8 +31,28 @@ describe("wallet snapshot validation", () => {
     expect(decodeWalletSnapshot(snapshot)).toEqual({ ok: true, state });
   });
 
+  test("normalizes legacy profile fields without requiring proofs", () => {
+    const source = SEED_CARDS[0];
+    if (source === undefined) throw new Error("Expected a seeded card");
+    const { username: _username, email: _email, ...legacy } = source;
+    const snapshot = { ...walletSnapshot(seededState()), cards: [legacy], activeId: legacy.id };
+    const decoded = decodeWalletSnapshot(snapshot);
+    expect(decoded).toMatchObject({
+      ok: true,
+      state: { cards: [{ username: legacy.handle, email: "finn@hey.com" }] },
+    });
+
+    const { proofs: _proofs, ...withoutProofs } = legacy;
+    const proofless = decodeWalletSnapshot({
+      ...snapshot,
+      cards: [withoutProofs],
+      activeId: withoutProofs.id,
+    });
+    expect(proofless).toMatchObject({ ok: true, state: { cards: [{ email: "" }] } });
+  });
+
   test("reports a recognized but unsupported version", () => {
-    const snapshot = walletSnapshot(createInitialWalletState(2_000_000_000_000));
+    const snapshot = walletSnapshot(seededState());
     expect(decodeWalletSnapshot({ ...snapshot, version: 2 })).toEqual({
       ok: false,
       reason: "unsupported",
@@ -35,14 +64,31 @@ describe("wallet snapshot validation", () => {
     expect(decodeWalletSnapshot({ version: "1" })).toEqual({ ok: false, reason: "invalid" });
   });
 
+  test("rejects legacy non-Nostr identities", () => {
+    const card = SEED_CARDS[0];
+    if (card === undefined) throw new Error("Expected a seeded card");
+    expect(
+      decodeWalletSnapshot({
+        ...walletSnapshot(seededState()),
+        cards: [
+          {
+            ...card,
+            identity: { publicKey: "A".repeat(43), privateKey: "B".repeat(86) },
+          },
+        ],
+        activeId: card.id,
+      }),
+    ).toEqual({ ok: false, reason: "invalid" });
+  });
+
   test("rejects invalid state fields", () => {
-    const snapshot = walletSnapshot(createInitialWalletState(2_000_000_000_000));
-    const firstProof = SEED_CARDS[0]?.proofs[0];
+    const snapshot = walletSnapshot(seededState());
+    const firstProof = SEED_CARDS[0]?.proofs?.[0];
     if (firstProof === undefined) throw new Error("Expected a seeded connected account");
 
     const invalid: readonly unknown[] = [
       null,
-      { ...snapshot, cards: [] },
+      { ...snapshot, cards: [], activeId: snapshot.activeId },
       { ...snapshot, activeId: "missing" },
       { ...snapshot, theme: "sepia" },
       { ...snapshot, contacts: [{ ...SEED_CONTACTS[0], mutuals: 1.5 }] },
@@ -102,7 +148,7 @@ describe("wallet snapshot validation", () => {
 
 describe("wallet local storage", () => {
   test("persists and restores state through the real localStorage implementation", () => {
-    const initial = createInitialWalletState(2_000_000_000_000);
+    const initial = seededState();
     const secondCard = initial.cards[1];
     if (secondCard === undefined) throw new Error("Expected seeded cards");
     const state: WalletState = {
@@ -122,8 +168,8 @@ describe("wallet local storage", () => {
   test("uses initial state when no snapshot exists", () => {
     const result = loadWalletState();
     expect(result.ok).toBe(true);
-    expect(result.state.cards).toEqual(SEED_CARDS);
-    expect(result.state.contacts).toEqual(SEED_CONTACTS);
+    expect(result.state.cards).toEqual([]);
+    expect(result.state.contacts).toEqual([]);
     expect(result.state.theme).toBe("system");
   });
 
@@ -134,11 +180,9 @@ describe("wallet local storage", () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("Expected corrupt storage to fail validation");
     expect(result.reason).toBe("invalid");
-    expect(result.state.cards).toEqual(SEED_CARDS);
-    expect(result.state.contacts).toEqual(SEED_CONTACTS);
-    const firstCard = SEED_CARDS[0];
-    if (firstCard === undefined) throw new Error("Expected seeded cards");
-    expect(result.state.activeId).toBe(firstCard.id);
+    expect(result.state.cards).toEqual([]);
+    expect(result.state.contacts).toEqual([]);
+    expect(result.state.activeId).toBe("");
   });
 
   test("falls back when stored JSON has an invalid snapshot shape", () => {
@@ -148,11 +192,11 @@ describe("wallet local storage", () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("Expected invalid storage to fail validation");
     expect(result.reason).toBe("invalid");
-    expect(result.state.cards).toEqual(SEED_CARDS);
+    expect(result.state.cards).toEqual([]);
   });
 
   test("refuses to persist state that its own decoder cannot restore", () => {
-    const invalid: WalletState = { ...createInitialWalletState(), cards: [] };
+    const invalid: WalletState = { ...createInitialWalletState(), activeId: "missing" };
 
     expect(saveWalletState(invalid)).toEqual({ ok: false, reason: "invalid" });
     expect(localStorage.getItem(WALLET_STORAGE_KEY)).toBeNull();

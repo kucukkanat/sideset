@@ -1,20 +1,33 @@
 import { type Card, EMOJI_CHOICES, paletteFor } from "@keychain/core";
-import { type ReactElement, useState } from "react";
+import { type FormEvent, type ReactElement, useState } from "react";
+import { CardAvatar } from "../components/CardAvatar.tsx";
 
 export const EditSheet = ({
   card,
   onSave,
 }: {
   card: Card;
-  onSave: (patch: { name: string; bio: string; avatar: string }) => void;
+  onSave: (patch: {
+    name: string;
+    username: string;
+    email: string;
+    bio: string;
+    avatar: string;
+  }) => void;
 }): ReactElement => {
   const [name, setName] = useState(card.name);
+  const [username, setUsername] = useState(card.username);
+  const [email, setEmail] = useState(card.email);
   const [bio, setBio] = useState(card.bio);
   const [avatar, setAvatar] = useState(card.avatar);
   const pal = paletteFor(card.color);
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    onSave({ name, username, email, bio, avatar });
+  };
 
   return (
-    <div data-testid="edit-card-sheet" style={{ animation: "riseIn .4s ease" }}>
+    <form data-testid="edit-card-sheet" onSubmit={submit} style={{ animation: "riseIn .4s ease" }}>
       <div style={{ textAlign: "center" }}>
         <div className="sheet-title">Edit card</div>
       </div>
@@ -32,7 +45,7 @@ export const EditSheet = ({
             boxShadow: `0 10px 24px -10px ${pal.shadow}`,
           }}
         >
-          {avatar}
+          <CardAvatar card={{ ...card, avatar }} style={{ width: 78, height: 78 }} />
         </div>
       </div>
       <div
@@ -44,6 +57,27 @@ export const EditSheet = ({
           flexWrap: "wrap",
         }}
       >
+        <button
+          type="button"
+          data-testid="edit-card-avatar-remove"
+          className="press"
+          onClick={() => setAvatar("")}
+          style={{
+            minHeight: 42,
+            border: "1px solid color-mix(in srgb, var(--kc-warning-text) 24%, transparent)",
+            borderRadius: 13,
+            padding: "10px 15px",
+            background: "var(--kc-warning-bg)",
+            color: "var(--kc-warning-text)",
+            fontSize: 13,
+            fontWeight: 800,
+            lineHeight: 1.2,
+            cursor: "pointer",
+            ["--press" as string]: 0.97,
+          }}
+        >
+          Remove picture
+        </button>
         {EMOJI_CHOICES.map((emoji) => (
           <div
             key={emoji}
@@ -83,6 +117,33 @@ export const EditSheet = ({
       </div>
       <div style={{ marginTop: 16 }}>
         <div className="sec-label" style={{ letterSpacing: 0.6, marginBottom: 8 }}>
+          Username
+        </div>
+        <input
+          data-testid="edit-card-username"
+          className="input"
+          maxLength={80}
+          style={{ padding: 15 }}
+          value={username}
+          onInput={(event) => setUsername(event.currentTarget.value)}
+        />
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <div className="sec-label" style={{ letterSpacing: 0.6, marginBottom: 8 }}>
+          Email
+        </div>
+        <input
+          data-testid="edit-card-email"
+          className="input"
+          type="email"
+          maxLength={254}
+          style={{ padding: 15 }}
+          value={email}
+          onInput={(event) => setEmail(event.currentTarget.value)}
+        />
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <div className="sec-label" style={{ letterSpacing: 0.6, marginBottom: 8 }}>
           About you
         </div>
         <textarea
@@ -90,20 +151,25 @@ export const EditSheet = ({
           className="input"
           maxLength={280}
           rows={3}
-          style={{ padding: 15, fontSize: 15, fontWeight: 600, resize: "none", lineHeight: 1.5 }}
+          style={{
+            padding: 15,
+            fontSize: 15,
+            fontWeight: 600,
+            resize: "none",
+            lineHeight: 1.5,
+          }}
           value={bio}
           onInput={(e) => setBio(e.currentTarget.value)}
         />
       </div>
-      <div
-        role="button"
+      <button
+        type="submit"
         data-testid="edit-card-save"
         className="btn-dark press"
-        onClick={() => onSave({ name, bio, avatar })}
-        style={{ marginTop: 22, ["--press" as string]: 0.97 }}
+        style={{ marginTop: 22, border: 0, ["--press" as string]: 0.97 }}
       >
         Save changes
-      </div>
-    </div>
+      </button>
+    </form>
   );
 };

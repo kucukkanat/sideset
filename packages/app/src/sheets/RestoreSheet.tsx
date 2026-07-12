@@ -1,4 +1,4 @@
-import { type ReactElement, useState } from "react";
+import { type FormEvent, type ReactElement, useState } from "react";
 import { MAX_BACKUP_BYTES } from "../backup.ts";
 import { CheckIcon, ShieldIcon } from "../icons.tsx";
 
@@ -36,6 +36,10 @@ export const RestoreSheet = ({
       setStep("form");
     }
   };
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    void restore();
+  };
 
   if (step === "done") {
     return (
@@ -61,8 +65,9 @@ export const RestoreSheet = ({
   }
 
   return (
-    <div
+    <form
       data-testid="restore-sheet"
+      onSubmit={submit}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -135,16 +140,20 @@ export const RestoreSheet = ({
           data-testid="restore-error"
           role="alert"
           data-theme-text="error"
-          style={{ color: "var(--kc-error)", fontSize: 12.5, fontWeight: 700, marginTop: 12 }}
+          style={{
+            color: "var(--kc-error)",
+            fontSize: 12.5,
+            fontWeight: 700,
+            marginTop: 12,
+          }}
         >
           {error}
         </div>
       )}
       <button
-        type="button"
+        type="submit"
         data-testid="restore-submit"
         className="btn-dark press"
-        onClick={() => void restore()}
         disabled={step === "restoring" || file === null || password.length === 0}
         style={{
           marginTop: 22,
@@ -155,6 +164,6 @@ export const RestoreSheet = ({
       >
         {step === "restoring" ? "Restoring…" : "Restore backup"}
       </button>
-    </div>
+    </form>
   );
 };

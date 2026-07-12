@@ -1,4 +1,4 @@
-export { addProof, createCard, removeProof, updateCard } from "./cards.ts";
+export { addProof, createCard, removeProof, searchCards, updateCard } from "./cards.ts";
 export {
   type CardPlacement,
   cardPlacement,

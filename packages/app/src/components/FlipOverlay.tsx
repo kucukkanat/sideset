@@ -2,6 +2,7 @@ import { type Card, type Contact, paletteFor } from "@keychain/core";
 import type { CSSProperties, ReactElement } from "react";
 import { FALLBACK_CARD_RECT, type Flip } from "../flip.ts";
 import { BackIcon, EditIcon } from "../icons.tsx";
+import { CardAvatar } from "./CardAvatar.tsx";
 import { CardFace } from "./CardFace.tsx";
 
 const isContact = (s: Card | Contact): s is Contact => "mutuals" in s;
@@ -100,18 +101,22 @@ export const FlipOverlay = ({
               <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                 <div
                   style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 13,
+                    width: 84,
+                    height: 84,
+                    borderRadius: 26,
                     background: "rgba(255,255,255,.22)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 22,
+                    fontSize: 44,
                     boxShadow: "0 0 0 1px rgba(255,255,255,.25) inset",
                   }}
                 >
-                  {subject.avatar}
+                  {!("mutuals" in subject) ? (
+                    <CardAvatar card={subject} style={{ width: "100%", height: "100%" }} />
+                  ) : (
+                    subject.avatar
+                  )}
                 </div>
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1 }}>{subject.name}</div>
@@ -159,7 +164,11 @@ export const FlipOverlay = ({
           </div>
           <div className="hero-id">
             <div className="hero-avatar" style={{ backdropFilter: "none" }}>
-              {subject.avatar}
+              {!("mutuals" in subject) ? (
+                <CardAvatar card={subject} style={{ width: "100%", height: "100%" }} />
+              ) : (
+                subject.avatar
+              )}
             </div>
             <div className="hero-name">{subject.name}</div>
             <div className="hero-tag">{tag}</div>

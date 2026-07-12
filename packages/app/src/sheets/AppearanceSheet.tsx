@@ -1,15 +1,21 @@
+import { type LucideIcon, MonitorCog, Moon, Sun } from "lucide-react";
 import type { ReactElement } from "react";
 import type { ThemePreference } from "../screens/Settings.tsx";
 
 const OPTIONS: readonly {
   readonly value: ThemePreference;
-  readonly icon: string;
+  readonly icon: LucideIcon;
   readonly label: string;
   readonly description: string;
 }[] = [
-  { value: "system", icon: "⚙️", label: "Use device setting", description: "Match this device" },
-  { value: "light", icon: "☀️", label: "Light", description: "Always use the light theme" },
-  { value: "dark", icon: "🌙", label: "Dark", description: "Always use the dark theme" },
+  {
+    value: "system",
+    icon: MonitorCog,
+    label: "Use device setting",
+    description: "Match this device",
+  },
+  { value: "light", icon: Sun, label: "Light", description: "Always use the light theme" },
+  { value: "dark", icon: Moon, label: "Dark", description: "Always use the dark theme" },
 ];
 
 export const AppearanceSheet = ({
@@ -33,6 +39,7 @@ export const AppearanceSheet = ({
     >
       {OPTIONS.map((option) => {
         const selected = option.value === theme;
+        const Icon = option.icon;
         return (
           <button
             type="button"
@@ -53,7 +60,7 @@ export const AppearanceSheet = ({
             }}
           >
             <span className="row-icon" style={{ background: "#F2EBE0" }}>
-              {option.icon}
+              <Icon aria-hidden="true" size={19} strokeWidth={2.1} />
             </span>
             <span className="row-body">
               <span className="row-title" style={{ display: "block" }}>

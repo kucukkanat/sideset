@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
 
 /**
@@ -179,19 +180,7 @@ export const Sheet = ({
               padding: 0,
             }}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              role="img"
-              aria-label="Close"
-            >
-              <path d="M2 2l10 10M12 2L2 12" />
-            </svg>
+            <X aria-hidden="true" size={16} strokeWidth={2.2} />
           </button>
         </div>
         <div

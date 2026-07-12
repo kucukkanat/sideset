@@ -1,12 +1,12 @@
 import type { ReactElement } from "react";
 import { NavIcon, type NavIconKind } from "../icons.tsx";
 
-export type NavKey = "home" | "contacts" | "activity" | "settings";
+export type NavKey = "home" | "contacts" | "tools" | "settings";
 
 const ITEMS: readonly { key: NavKey; label: string; icon: NavIconKind }[] = [
   { key: "home", label: "Wallet", icon: "wallet" },
   { key: "contacts", label: "People", icon: "people" },
-  { key: "activity", label: "Activity", icon: "clock" },
+  { key: "tools", label: "Tools", icon: "tools" },
   { key: "settings", label: "Settings", icon: "gear" },
 ];
 

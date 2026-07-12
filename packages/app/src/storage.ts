@@ -1,13 +1,6 @@
-import {
-  type Card,
-  type Contact,
-  type IdentityKeyPair,
-  type Proof,
-  type ProviderId,
-  SEED_CARDS,
-  SEED_CONTACTS,
-} from "@keychain/core";
-import { type ActivityIcon, type ActivityItem, createInitialActivity } from "./activity.ts";
+import type { Card, Contact, IdentityKeyPair, Proof, ProviderId } from "@keychain/core";
+import type { ActivityIcon, ActivityItem } from "./activity.ts";
+import { isAvatar } from "./avatar.ts";
 
 export const WALLET_STORAGE_KEY = "keychain.wallet.v1";
 export const MAX_CARDS = 100;
@@ -58,20 +51,20 @@ const isText = (value: unknown, max: number, allowEmpty = true): value is string
 const isProvider = (value: unknown): value is ProviderId =>
   typeof value === "string" && PROVIDERS.some((provider) => provider === value);
 
-const isBase64Url = (value: string): boolean => /^[A-Za-z0-9_-]+$/u.test(value);
+const isNostrKey = (value: string): boolean => /^[0-9a-f]{64}$/u.test(value);
 
 const isIdentity = (value: unknown): value is IdentityKeyPair =>
   isRecord(value) &&
-  isText(value.publicKey, 100, false) &&
-  isBase64Url(value.publicKey) &&
-  isText(value.privateKey, 2_000, false) &&
-  isBase64Url(value.privateKey);
+  typeof value.publicKey === "string" &&
+  typeof value.privateKey === "string" &&
+  isNostrKey(value.publicKey) &&
+  isNostrKey(value.privateKey);
 
 const isProof = (value: unknown): value is Proof =>
   isRecord(value) &&
   isProvider(value.provider) &&
   isText(value.username, 120, false) &&
-  (value.verificationCode === undefined || isText(value.verificationCode, 512, false));
+  (value.verificationCode === undefined || isText(value.verificationCode, 2_000, false));
 
 const hasUniqueProofs = (value: unknown[]): value is Proof[] =>
   value.every(isProof) && new Set(value.map((proof) => proof.provider)).size === value.length;
@@ -81,14 +74,17 @@ const isCard = (value: unknown): value is Card =>
   isText(value.id, 100, false) &&
   isText(value.name, 50, false) &&
   isText(value.handle, 80) &&
-  isText(value.avatar, 16, false) &&
+  (value.username === undefined || isText(value.username, 80)) &&
+  (value.email === undefined || isText(value.email, 254)) &&
+  isAvatar(value.avatar) &&
   typeof value.color === "number" &&
   Number.isInteger(value.color) &&
   isText(value.tag, 100) &&
   isText(value.bio, 280) &&
-  Array.isArray(value.proofs) &&
-  value.proofs.length <= PROVIDERS.length &&
-  hasUniqueProofs(value.proofs) &&
+  (value.proofs === undefined ||
+    (Array.isArray(value.proofs) &&
+      value.proofs.length <= PROVIDERS.length &&
+      hasUniqueProofs(value.proofs))) &&
   (value.identity === undefined || isIdentity(value.identity));
 
 const isContact = (value: unknown): value is Contact =>
@@ -130,12 +126,18 @@ const isActivity = (value: unknown): value is ActivityItem =>
 const isTheme = (value: unknown): value is Theme =>
   value === "system" || value === "light" || value === "dark";
 
-export const createInitialWalletState = (now = Date.now()): WalletState => ({
-  cards: SEED_CARDS,
-  contacts: SEED_CONTACTS,
-  activeId: SEED_CARDS[0]?.id ?? "",
+const normalizeCard = (card: Card): Card => ({
+  ...card,
+  username: card.username ?? card.handle,
+  email: card.email ?? card.proofs?.find((proof) => proof.provider === "email")?.username ?? "",
+});
+
+export const createInitialWalletState = (_now = Date.now()): WalletState => ({
+  cards: [],
+  contacts: [],
+  activeId: "",
   theme: "system",
-  activity: createInitialActivity(now),
+  activity: [],
 });
 
 export const walletSnapshot = (state: WalletState): WalletSnapshotV1 => ({ version: 1, ...state });
@@ -151,7 +153,6 @@ export const decodeWalletSnapshot = (value: unknown): SnapshotResult => {
   const activity = value.activity;
   if (
     !Array.isArray(cards) ||
-    cards.length === 0 ||
     cards.length > MAX_CARDS ||
     !cards.every(isCard) ||
     new Set(cards.map((card) => card.id)).size !== cards.length ||
@@ -160,7 +161,9 @@ export const decodeWalletSnapshot = (value: unknown): SnapshotResult => {
     !contacts.every(isContact) ||
     new Set(contacts.map((person) => person.id)).size !== contacts.length ||
     typeof value.activeId !== "string" ||
-    !cards.some((card) => card.id === value.activeId) ||
+    (cards.length === 0
+      ? value.activeId !== ""
+      : !cards.some((card) => card.id === value.activeId)) ||
     !isTheme(value.theme) ||
     !Array.isArray(activity) ||
     activity.length > 100 ||
@@ -172,7 +175,7 @@ export const decodeWalletSnapshot = (value: unknown): SnapshotResult => {
   return {
     ok: true,
     state: {
-      cards,
+      cards: cards.map(normalizeCard),
       contacts,
       activeId: value.activeId,
       theme: value.theme,

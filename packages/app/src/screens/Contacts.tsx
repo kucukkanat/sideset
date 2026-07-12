@@ -1,4 +1,5 @@
 import { type Contact, paletteFor, searchContacts } from "@keychain/core";
+import { Check, Search, Trash2, UsersRound } from "lucide-react";
 import {
   type MutableRefObject,
   type ReactElement,
@@ -133,21 +134,23 @@ export const Contacts = ({
             <h1 className="hdr-title">People</h1>
           </div>
           <div className="contacts-header-actions">
-            <button
-              ref={manageButtonRef}
-              data-testid="contacts-manage"
-              type="button"
-              className="contact-toolbar-button press"
-              aria-pressed={managing}
-              aria-controls="contacts-list"
-              onClick={() => {
-                if (managing) finishManaging();
-                else setManaging(true);
-              }}
-            >
-              {managing ? "Done" : "Manage"}
-            </button>
-            {!managing && (
+            {contacts.length > 0 && (
+              <button
+                ref={manageButtonRef}
+                data-testid="contacts-manage"
+                type="button"
+                className="contact-toolbar-button press"
+                aria-pressed={managing}
+                aria-controls="contacts-list"
+                onClick={() => {
+                  if (managing) finishManaging();
+                  else setManaging(true);
+                }}
+              >
+                {managing ? "Done" : "Manage"}
+              </button>
+            )}
+            {!managing && contacts.length > 0 && (
               <button
                 data-testid="contacts-import-profile"
                 type="button"
@@ -197,7 +200,9 @@ export const Contacts = ({
 
         {contacts.length === 0 ? (
           <div data-testid="contacts-empty" className="contacts-empty">
-            <div className="contacts-empty-icon">👥</div>
+            <div className="contacts-empty-icon">
+              <UsersRound aria-hidden="true" size={42} />
+            </div>
             <h2>No contacts yet</h2>
             <p>Add a profile link or public key to start your private address book.</p>
             <button
@@ -211,7 +216,9 @@ export const Contacts = ({
           </div>
         ) : visibleContacts.length === 0 ? (
           <div data-testid="contacts-no-results" className="contacts-empty">
-            <div className="contacts-empty-icon">🔎</div>
+            <div className="contacts-empty-icon">
+              <Search aria-hidden="true" size={42} />
+            </div>
             <h2>No matching people</h2>
             <p>Try a name, handle, connected account, or public key.</p>
             <button
@@ -260,7 +267,9 @@ export const Contacts = ({
                         <small>{accountLabel}</small>
                       </span>
                       <span className="contact-selection-mark" aria-hidden="true">
-                        {selectedContact ? "✓" : ""}
+                        {selectedContact ? (
+                          <Check aria-hidden="true" size={14} strokeWidth={3} />
+                        ) : null}
                       </span>
                     </label>
                   ) : (
@@ -339,7 +348,9 @@ export const Contacts = ({
             aria-labelledby="remove-contacts-title"
             aria-describedby="remove-contacts-description"
           >
-            <div className="contact-confirm-icon">🗑️</div>
+            <div className="contact-confirm-icon">
+              <Trash2 aria-hidden="true" size={38} />
+            </div>
             <h2 id="remove-contacts-title">
               Remove {selectedCount} {selectedCount === 1 ? "contact" : "contacts"}?
             </h2>

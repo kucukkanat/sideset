@@ -34,6 +34,7 @@ import { ContactDetail } from "./screens/ContactDetail.tsx";
 import { Contacts } from "./screens/Contacts.tsx";
 import { Home } from "./screens/Home.tsx";
 import { Settings } from "./screens/Settings.tsx";
+import { Tools } from "./screens/Tools.tsx";
 import {
   encodeSharedProfile,
   type SharedProfile,
@@ -48,9 +49,11 @@ import { CreateSheet } from "./sheets/CreateSheet.tsx";
 import { type EditContactResult, EditContactSheet } from "./sheets/EditContactSheet.tsx";
 import { EditSheet } from "./sheets/EditSheet.tsx";
 import { HelpSheet } from "./sheets/HelpSheet.tsx";
+import { ResetSheet } from "./sheets/ResetSheet.tsx";
 import { type RestoreResult, RestoreSheet } from "./sheets/RestoreSheet.tsx";
 import { ShareSheet } from "./sheets/ShareSheet.tsx";
 import {
+  createInitialWalletState,
   decodeWalletSnapshot,
   loadWalletState,
   MAX_CARDS,
@@ -61,12 +64,6 @@ import {
   walletSnapshot,
 } from "./storage.ts";
 import { useHashRouter } from "./useHashRouter.ts";
-
-const first = <T,>(values: readonly T[]): T => {
-  const value = values[0];
-  if (value === undefined) throw new Error("Expected a non-empty list");
-  return value;
-};
 
 const withActivity = (
   state: WalletState,
@@ -83,6 +80,9 @@ export const App = (): ReactElement => {
   const { route, push, replace, back, closeOverlay } = useHashRouter();
   const [loaded] = useState(loadWalletState);
   const [wallet, setWallet] = useState<WalletState>(loaded.state);
+  const [firstCardCreationOpen, setFirstCardCreationOpen] = useState(
+    loaded.state.cards.length === 0,
+  );
   const [contactQuery, setContactQuery] = useState("");
   const [contactManaging, setContactManaging] = useState(false);
   const [contactRemovalOpen, setContactRemovalOpen] = useState(false);
@@ -90,7 +90,7 @@ export const App = (): ReactElement => {
     loaded.ok || loaded.reason !== "unsupported",
   );
   const { cards, contacts, activeId, activity, theme } = wallet;
-  const active = cards.find((card) => card.id === activeId) ?? first(cards);
+  const active = cards.find((card) => card.id === activeId);
   const detail = route.page === "card" ? cards.find((card) => card.id === route.cardId) : undefined;
   const connectCard =
     route.page === "card"
@@ -351,8 +351,8 @@ export const App = (): ReactElement => {
       case "contacts":
         push({ page: "people" });
         break;
-      case "activity":
-        push({ page: "activity" });
+      case "tools":
+        push({ page: "tools", operation: "encrypt" });
         break;
       case "settings":
         push({ page: "settings" });
@@ -363,15 +363,15 @@ export const App = (): ReactElement => {
   const navCurrent: NavKey =
     route.page === "people" || route.page === "person"
       ? "contacts"
-      : route.page === "activity"
-        ? "activity"
+      : route.page === "tools"
+        ? "tools"
         : route.page === "settings"
           ? "settings"
           : "home";
 
   const activate = (card: Card): void => {
     if (card.id === activeId) return;
-    const previous = active.name;
+    const previous = active?.name ?? card.name;
     setWallet((state) =>
       withActivity(
         { ...state, activeId: card.id },
@@ -386,27 +386,40 @@ export const App = (): ReactElement => {
     showToast(`${card.name} is now active`);
   };
 
-  const finishCreate = (input: { name: string; avatar: string; color: number }): void => {
+  const finishCreate = (input: {
+    name: string;
+    username: string;
+    email: string;
+    avatar: string;
+    color: number;
+    identity: IdentityKeyPair;
+  }): boolean => {
     if (cards.length >= MAX_CARDS) {
       showToast("This preview can hold up to 100 cards");
-      return;
+      return false;
     }
     const card = createCard({ id: crypto.randomUUID(), ...input });
     setWallet((state) =>
       withActivity(
         { ...state, cards: [...state.cards, card], activeId: card.id },
         createActivity(
-          { kind: "emoji", emoji: card.avatar, bg: "#E9F7EC" },
+          { kind: "emoji", emoji: card.avatar || "🙂", bg: "#E9F7EC" },
           `Created ${card.name} card`,
           "A separate profile",
         ),
       ),
     );
-    replace({ page: "wallet", cardId: card.id });
     showToast("Card created and activated");
+    return true;
   };
 
-  const saveEdit = (patch: { name: string; bio: string; avatar: string }): void => {
+  const saveEdit = (patch: {
+    name: string;
+    username: string;
+    email: string;
+    bio: string;
+    avatar: string;
+  }): void => {
     if (detail === undefined) return;
     const name = patch.name.trim();
     if (name.length === 0) {
@@ -417,7 +430,7 @@ export const App = (): ReactElement => {
       withActivity(
         { ...state, cards: updateCard(state.cards, detail.id, { ...patch, name }) },
         createActivity(
-          { kind: "emoji", emoji: patch.avatar, bg: "#FCEDE7" },
+          { kind: "emoji", emoji: patch.avatar || "🙂", bg: "#FCEDE7" },
           `Updated ${name}`,
           "Card details changed",
         ),
@@ -654,6 +667,22 @@ export const App = (): ReactElement => {
     setWallet((state) => ({ ...state, theme: nextTheme }));
   };
 
+  const resetApplication = (): void => {
+    const reset = createInitialWalletState();
+    if (!saveWalletState(reset).ok) {
+      showToast("The application couldn’t be reset on this device");
+      return;
+    }
+    setPersistenceEnabled(true);
+    setWallet(reset);
+    setFirstCardCreationOpen(true);
+    setContactQuery("");
+    setContactManaging(false);
+    setContactRemovalOpen(false);
+    replace({ page: "settings" });
+    showToast("Application reset");
+  };
+
   const overlayOpen =
     routeWithoutOverlay(route) !== null &&
     (route.page !== "card" || detail !== undefined) &&
@@ -679,7 +708,19 @@ export const App = (): ReactElement => {
   return (
     <div data-testid="app-root" style={{ width: "100%", height: "100vh", minHeight: "100dvh" }}>
       <div data-testid="app-frame" className="frame" ref={frameRef}>
-        {route.page === "wallet" && (
+        {firstCardCreationOpen && (
+          <div style={{ padding: 24, overflow: "auto", height: "100%" }}>
+            <CreateSheet
+              onFinish={finishCreate}
+              onDone={() => {
+                setFirstCardCreationOpen(false);
+                replace({ page: "wallet", cardId: wallet.activeId });
+              }}
+              onToast={showToast}
+            />
+          </div>
+        )}
+        {!firstCardCreationOpen && route.page === "wallet" && active !== undefined && (
           <Home
             cards={cards}
             activeId={activeId}
@@ -687,12 +728,11 @@ export const App = (): ReactElement => {
             carIndex={selectedIndex}
             onCarIndex={(index) => {
               const selected = cards[index];
-              if (selected !== undefined) replace({ page: "wallet", cardId: selected.id });
+              if (selected !== undefined) activate(selected);
             }}
             interactive={flip === null && !overlayOpen}
             hideFrontCard={flip?.dir === "rev" && flip.kind === "card"}
             frontCardRef={frontCardRef}
-            onActivate={activate}
             onOpenDetail={openDetailFlip}
             onImport={() => push({ page: "people", sheet: "add" })}
             onCreate={() =>
@@ -726,7 +766,17 @@ export const App = (): ReactElement => {
           />
         )}
         {route.page === "activity" && <Activity items={activity} />}
-        {route.page === "settings" && (
+        {route.page === "tools" && active !== undefined && (
+          <Tools
+            active={active}
+            cards={cards}
+            contacts={contacts}
+            operation={route.operation}
+            onOperation={(operation) => push({ page: "tools", operation })}
+            onToast={showToast}
+          />
+        )}
+        {route.page === "settings" && active !== undefined && (
           <Settings
             active={active}
             theme={theme}
@@ -738,6 +788,8 @@ export const App = (): ReactElement => {
             onBackup={() => push({ page: "settings", sheet: "backup" })}
             onRestore={() => push({ page: "settings", sheet: "restore" })}
             onHelp={() => push({ page: "settings", sheet: "help" })}
+            onReset={() => push({ page: "settings", sheet: "reset" })}
+            onActivity={() => push({ page: "activity" })}
           />
         )}
         {route.page === "card" && detail !== undefined && (
@@ -772,9 +824,11 @@ export const App = (): ReactElement => {
           />
         )}
 
-        {!overlayOpen && !contactManaging && !contactRemovalOpen && (
-          <BottomNav current={navCurrent} onGo={go} />
-        )}
+        {!firstCardCreationOpen &&
+          active !== undefined &&
+          !overlayOpen &&
+          !contactManaging &&
+          !contactRemovalOpen && <BottomNav current={navCurrent} onGo={go} />}
 
         {overlayOpen && (
           <Sheet
@@ -783,7 +837,11 @@ export const App = (): ReactElement => {
             dismissible={route.page !== "person" || route.sheet !== "edit"}
           >
             {route.page === "wallet" && route.sheet === "create" && (
-              <CreateSheet onFinish={finishCreate} onToast={showToast} />
+              <CreateSheet
+                onFinish={finishCreate}
+                onDone={() => replace({ page: "wallet", cardId: wallet.activeId })}
+                onToast={showToast}
+              />
             )}
             {((route.page === "wallet" && route.sheet === "connect") ||
               (route.page === "card" && route.sheet === "connect")) &&
@@ -836,6 +894,9 @@ export const App = (): ReactElement => {
               <AppearanceSheet theme={theme} onChange={changeTheme} />
             )}
             {route.page === "settings" && route.sheet === "help" && <HelpSheet />}
+            {route.page === "settings" && route.sheet === "reset" && (
+              <ResetSheet onReset={resetApplication} />
+            )}
           </Sheet>
         )}
 

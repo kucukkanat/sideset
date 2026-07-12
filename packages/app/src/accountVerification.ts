@@ -1,4 +1,6 @@
 import type { Card, IdentityKeyPair, ProviderId } from "@keychain/core";
+import { finalizeEvent, type NostrEvent, verifyEvent } from "nostr-tools/pure";
+import { generateNostrIdentity } from "./tools.ts";
 
 export type GithubProfile = {
   readonly login: string;
@@ -20,12 +22,10 @@ export type GithubVerificationResult =
 
 export type SignedProofEnvelope = {
   readonly version: 1;
-  readonly nonce: string;
-  readonly signature: string;
+  readonly event: NostrEvent;
 };
 
 const GITHUB_USERNAME = /^(?!-)[A-Za-z0-9-]{1,39}(?<!-)$/;
-const SIGNING_ALGORITHM = { name: "Ed25519" } as const;
 
 export const isGithubUsername = (value: string): boolean => GITHUB_USERNAME.test(value.trim());
 
@@ -51,12 +51,6 @@ const fromBase64Url = (value: string): Uint8Array | null => {
   }
 };
 
-const encodeJson = (value: unknown): string =>
-  toBase64Url(new TextEncoder().encode(JSON.stringify(value)));
-
-const asArrayBuffer = (bytes: Uint8Array): ArrayBuffer =>
-  new Uint8Array(bytes).buffer as ArrayBuffer;
-
 const decodeJson = (value: string): Record<string, unknown> | null => {
   const bytes = fromBase64Url(value);
   if (bytes === null) return null;
@@ -70,13 +64,6 @@ const decodeJson = (value: string): Record<string, unknown> | null => {
   }
 };
 
-const publicJwk = (publicKey: string): JsonWebKey => ({
-  kty: "OKP",
-  crv: "Ed25519",
-  x: publicKey,
-  ext: true,
-});
-
 const proofMessage = (
   provider: ProviderId,
   username: string,
@@ -86,22 +73,7 @@ const proofMessage = (
   new TextEncoder().encode(`keychain-proof-v1|${provider}|${username}|${publicKey}|${nonce}`);
 
 export const generateIdentityKeyPair = async (): Promise<IdentityKeyPair> => {
-  const generated = await crypto.subtle.generateKey(SIGNING_ALGORITHM, true, ["sign", "verify"]);
-  const keyPair = generated as CryptoKeyPair;
-  const publicJwkValue = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
-  const privateJwkValue = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
-  if (typeof publicJwkValue.x !== "string" || typeof privateJwkValue.d !== "string") {
-    throw new Error("The browser did not return an Ed25519 key pair");
-  }
-  return { publicKey: publicJwkValue.x, privateKey: encodeJson(privateJwkValue) };
-};
-
-const importPrivateKey = async (identity: IdentityKeyPair): Promise<CryptoKey> => {
-  const jwk = decodeJson(identity.privateKey);
-  if (jwk === null || typeof jwk.d !== "string" || typeof jwk.x !== "string") {
-    throw new Error("The saved identity key is invalid");
-  }
-  return crypto.subtle.importKey("jwk", jwk, SIGNING_ALGORITHM, false, ["sign"]);
+  return generateNostrIdentity();
 };
 
 export const createGithubVerificationCode = async (
@@ -111,32 +83,27 @@ export const createGithubVerificationCode = async (
   const normalized = username.trim();
   if (!isGithubUsername(normalized)) throw new TypeError("Invalid GitHub username");
   const nonce = toBase64Url(crypto.getRandomValues(new Uint8Array(12)));
-  const key = await importPrivateKey(identity);
-  const signature = await crypto.subtle.sign(
-    SIGNING_ALGORITHM,
-    key,
-    asArrayBuffer(proofMessage("github", normalized, identity.publicKey, nonce)),
+  const event = finalizeEvent(
+    {
+      kind: 27235,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [["nonce", nonce]],
+      content: new TextDecoder().decode(
+        proofMessage("github", normalized, identity.publicKey, nonce),
+      ),
+    },
+    Uint8Array.from(identity.privateKey.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16)),
   );
-  return `kc1.${nonce}.${toBase64Url(new Uint8Array(signature))}`;
+  return `kc1.${toBase64Url(new TextEncoder().encode(JSON.stringify(event)))}`;
 };
 
 export const parseSignedProof = (code: string): SignedProofEnvelope | null => {
   const parts = code.trim().split(".");
-  if (parts.length !== 3 || parts[0] !== "kc1") return null;
-  const nonce = parts[1];
-  const signature = parts[2];
-  if (nonce === undefined || signature === undefined) return null;
-  const nonceBytes = fromBase64Url(nonce);
-  const signatureBytes = fromBase64Url(signature);
-  if (
-    nonceBytes === null ||
-    nonceBytes.length !== 12 ||
-    signatureBytes === null ||
-    signatureBytes.length !== 64
-  ) {
-    return null;
-  }
-  return { version: 1, nonce, signature };
+  if (parts.length !== 2 || parts[0] !== "kc1" || parts[1] === undefined) return null;
+  const decoded = decodeJson(parts[1]);
+  if (decoded === null) return null;
+  const event = decoded as NostrEvent;
+  return verifyEvent(event) ? { version: 1, event } : null;
 };
 
 export const verifySignedProof = async (
@@ -149,27 +116,14 @@ export const verifySignedProof = async (
 ): Promise<boolean> => {
   const parsed = parseSignedProof(code);
   if (parsed === null || expected.publicKey.length === 0) return false;
-  const signatureBytes = fromBase64Url(parsed.signature);
-  if (signatureBytes === null) return false;
-  try {
-    const key = await crypto.subtle.importKey(
-      "jwk",
-      publicJwk(expected.publicKey),
-      SIGNING_ALGORITHM,
-      false,
-      ["verify"],
-    );
-    return await crypto.subtle.verify(
-      SIGNING_ALGORITHM,
-      key,
-      asArrayBuffer(signatureBytes),
-      asArrayBuffer(
-        proofMessage(expected.provider, expected.username.trim(), expected.publicKey, parsed.nonce),
-      ),
-    );
-  } catch {
-    return false;
-  }
+  const nonce = parsed.event.tags.find((tag) => tag[0] === "nonce")?.[1];
+  if (nonce === undefined || parsed.event.pubkey !== expected.publicKey) return false;
+  return (
+    parsed.event.content ===
+    new TextDecoder().decode(
+      proofMessage(expected.provider, expected.username.trim(), expected.publicKey, nonce),
+    )
+  );
 };
 
 export const addVerifiedGithubProof = (
@@ -183,13 +137,14 @@ export const addVerifiedGithubProof = (
   if (normalized.length === 0 || verificationCode.trim().length === 0) return cards;
   return cards.map((card) => {
     if (card.id !== cardId) return card;
-    const existing = card.proofs.find((proof) => proof.provider === "github");
+    const proofs = card.proofs ?? [];
+    const existing = proofs.find((proof) => proof.provider === "github");
     if (existing?.verificationCode !== undefined) return card;
     return {
       ...card,
       identity,
       proofs: [
-        ...card.proofs.filter((proof) => proof.provider !== "github"),
+        ...proofs.filter((proof) => proof.provider !== "github"),
         { provider: "github", username: normalized, verificationCode },
       ],
     };

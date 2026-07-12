@@ -1,14 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/web-manifest-combined.json",
   "id": "./",
-  "name": "Keychain",
-  "short_name": "Keychain",
+  "name": "Sideset",
+  "short_name": "Sideset",
   "description": "Keep the different parts of your life organized in simple profile cards.",
   "start_url": "./#/wallet",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4efe8",
-  "theme_color": "#f4efe8",
+  "background_color": "#F7F1E7",
+  "theme_color": "#F7F1E7",
   "categories": ["utilities", "social"],
   "icons": [
     {

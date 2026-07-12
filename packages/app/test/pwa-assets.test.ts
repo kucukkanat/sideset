@@ -17,10 +17,16 @@ const pngDimensions = async (url: URL): Promise<readonly [number, number]> => {
   return [view.getUint32(16), view.getUint32(20)];
 };
 
+const pngColorType = async (url: URL): Promise<number> => {
+  const buffer = await Bun.file(url).arrayBuffer();
+  return new DataView(buffer).getUint8(25);
+};
+
 describe("PWA assets", () => {
   test("declares an installable, hash-routed manifest with correctly sized icons", async () => {
     const manifest = await readObject(new URL("../manifest.webmanifest", import.meta.url));
     expect(manifest.display).toBe("standalone");
+    expect(manifest.name).toBe("Sideset");
     expect(manifest.start_url).toBe("./#/wallet");
     expect(manifest.scope).toBe("./");
 
@@ -56,8 +62,25 @@ describe("PWA assets", () => {
     const html = await Bun.file(new URL("../index.html", import.meta.url)).text();
     expect(html).toContain('rel="manifest"');
     expect(html).toContain('rel="apple-touch-icon"');
+    expect(html).toContain('href="./icons/favicon-32.png"');
+    expect(html).toContain("<title>Sideset</title>");
     expect(html).toContain('name="theme-color"');
     expect(html).not.toContain("fonts.googleapis.com");
     expect(html).not.toContain("fonts.gstatic.com");
+  });
+
+  test("ships transparent light, dark, mark, and favicon PNGs", async () => {
+    const assets = [
+      "../assets/brand/sideset-logo-light.png",
+      "../assets/brand/sideset-logo-dark.png",
+      "../assets/brand/sideset-mark.png",
+      "../icons/favicon-32.png",
+    ] as const;
+    for (const asset of assets) {
+      expect(await pngColorType(new URL(asset, import.meta.url))).toBe(6);
+    }
+    expect(await pngDimensions(new URL("../icons/favicon-32.png", import.meta.url))).toEqual([
+      32, 32,
+    ]);
   });
 });

@@ -16,10 +16,15 @@ import {
 } from "../src/sharedProfile.ts";
 import { createInitialWalletState, decodeWalletSnapshot, walletSnapshot } from "../src/storage.ts";
 
-const PROFILE: Pick<Card, "id" | "name" | "handle" | "avatar" | "color" | "bio" | "proofs"> = {
+const PROFILE: Pick<
+  Card,
+  "id" | "name" | "handle" | "username" | "email" | "avatar" | "color" | "bio" | "proofs"
+> = {
   id: "card-unicode",
   name: "  Çağrı 李  ",
   handle: "cagri_李",
+  username: "cagri_李",
+  email: "cagri@example.test",
   avatar: "🧑🏽‍💻",
   color: 4,
   bio: "İstanbul’dan merhaba — こんにちは 🌊",
@@ -55,6 +60,8 @@ describe("shared profile encoding", () => {
         sourceId: PROFILE.id,
         name: "Çağrı 李",
         handle: PROFILE.handle,
+        username: PROFILE.username,
+        email: PROFILE.email,
         avatar: PROFILE.avatar,
         color: PROFILE.color,
         bio: PROFILE.bio,
@@ -134,15 +141,15 @@ describe("shared profile encoding", () => {
 });
 
 describe("shared profile contacts", () => {
-  test("creates a local contact profile from an Ed25519 public key", () => {
-    const publicKey = "A".repeat(43);
+  test("creates a local contact profile from a Nostr public key", () => {
+    const publicKey = "a".repeat(64);
     expect(parseEd25519PublicKey(`  ${publicKey}\n`)).toBe(publicKey);
     expect(sharedProfileFromPublicKey(publicKey, "  Ada Key  ")).toEqual({
       version: 1,
       sourceId: publicKey,
       publicKey,
       name: "Ada Key",
-      handle: "AAAAAAAA…AAAAAA",
+      handle: "aaaaaaaa…aaaaaa",
       avatar: "🔑",
       color: 3,
       bio: "",

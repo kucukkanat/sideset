@@ -15,9 +15,9 @@ export interface Proof {
 }
 
 export interface IdentityKeyPair {
-  /** Raw Ed25519 public key, encoded as unpadded base64url. */
+  /** Nostr x-only secp256k1 public key, encoded as 64 lowercase hex characters. */
   readonly publicKey: string;
-  /** Extractable private-key JWK, encoded as unpadded base64url for local persistence only. */
+  /** Nostr secp256k1 secret key, encoded as 64 lowercase hex characters for local persistence only. */
   readonly privateKey: string;
 }
 
@@ -26,11 +26,13 @@ export interface Card {
   readonly id: string;
   readonly name: string;
   readonly handle: string;
+  readonly username: string;
+  readonly email: string;
   readonly avatar: string;
   readonly color: number;
   readonly tag: string;
   readonly bio: string;
-  readonly proofs: readonly Proof[];
+  readonly proofs?: readonly Proof[];
   readonly identity?: IdentityKeyPair;
 }
 

@@ -6,7 +6,10 @@ const appDir = fileURLToPath(new URL("../", import.meta.url));
 const distDir = join(appDir, "dist");
 const staticAssets = [
   "manifest.webmanifest",
-  "icons/icon.svg",
+  "assets/brand/sideset-logo-light.png",
+  "assets/brand/sideset-logo-dark.png",
+  "assets/brand/sideset-mark.png",
+  "icons/favicon-32.png",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/icon-maskable-512.png",
@@ -21,6 +24,7 @@ const appBuild = await Bun.build({
   outdir: distDir,
   target: "browser",
   minify: true,
+  splitting: true,
   define: { "process.env.NODE_ENV": JSON.stringify("production") },
 });
 if (!appBuild.success) {

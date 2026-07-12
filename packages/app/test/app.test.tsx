@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { SEED_CARDS, SEED_CONTACTS } from "@keychain/core";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "../src/App.tsx";
 import { generateIdentityKeyPair } from "../src/accountVerification.ts";
+import { createInitialActivity } from "../src/activity.ts";
 import { createEncryptedBackup } from "../src/backup.ts";
 import {
   decodeSharedProfile,
@@ -18,6 +20,14 @@ import {
 
 let container: HTMLDivElement | undefined;
 let root: Root | undefined;
+
+const createTestWalletState = (): ReturnType<typeof createInitialWalletState> => ({
+  ...createInitialWalletState(),
+  cards: SEED_CARDS,
+  contacts: SEED_CONTACTS,
+  activeId: SEED_CARDS[0]?.id ?? "",
+  activity: createInitialActivity(),
+});
 
 const tick = async (milliseconds = 0): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -52,6 +62,7 @@ const mount = async (hash = "#/wallet"): Promise<void> => {
 
 beforeEach(() => {
   localStorage.clear();
+  saveWalletState(createTestWalletState());
   window.history.replaceState(null, "", "#/wallet");
   document.documentElement.removeAttribute("data-theme");
 });
@@ -168,9 +179,136 @@ const expectInteractiveElementsToHaveTestIds = (): void => {
 };
 
 describe("honest client-only wallet", () => {
+  test("keeps wide carousel cards contained when profile text is long", async () => {
+    const state = createTestWalletState();
+    const first = state.cards[0];
+    if (first === undefined) throw new Error("Expected a seeded card");
+    const name = "A very long card name that must remain inside the carousel card";
+    const tag = "AnUnbrokenTagThatCannotNaturallyWrapAndMustBeTruncated";
+    saveWalletState({
+      ...state,
+      cards: [{ ...first, name, tag }, ...state.cards.slice(1)],
+    });
+
+    await mount();
+
+    const card = byTestId(`home-card-${first.id}`);
+    const nameElement = card.querySelector<HTMLElement>("[data-card-field='name']");
+    const tagElement = card.querySelector<HTMLElement>("[data-card-field='tag']");
+    const face = card.firstElementChild as HTMLElement | null;
+    const avatar = card.querySelector<HTMLElement>(
+      '[data-testid^="card-"][data-testid$="-avatar"]',
+    );
+    expect(card.style.width).toBe("350px");
+    expect(face?.style.userSelect).toBe("none");
+    expect(avatar?.parentElement?.style.width).toBe("84px");
+    expect(avatar?.parentElement?.style.height).toBe("84px");
+    expect(nameElement?.style.textOverflow).toBe("ellipsis");
+    expect(nameElement?.style.overflow).toBe("hidden");
+    expect(tagElement?.style.textOverflow).toBe("ellipsis");
+    expect(tagElement?.style.overflow).toBe("hidden");
+  });
+
+  test("creates the first card with a local identity and generated avatar", async () => {
+    localStorage.clear();
+    await mount();
+    expect(maybeByText("Create a card")).toBeDefined();
+    await waitFor(
+      () => maybeByTestId("card-generated-avatar") !== undefined,
+      "Generated avatar did not become ready",
+    );
+    expect(byTestId("card-generated-avatar").style.borderRadius).toBe("30%");
+    expect(byTestId("card-generated-avatar").style.overflow).toBe("hidden");
+    await type(byTestId("create-card-name") as HTMLInputElement, "Personal");
+    await click(byTestId("create-card-submit"));
+    await act(async () => {
+      await tick(700);
+    });
+
+    const card = loadWalletState().state.cards[0];
+    expect(card?.name).toBe("Personal");
+    expect(card?.avatar).toBe("");
+    expect(card?.identity?.publicKey).toMatch(/^[A-Za-z0-9_-]+$/u);
+    expect(card?.identity?.privateKey).toMatch(/^[A-Za-z0-9_-]+$/u);
+    expect(maybeByTestId("create-card-complete")).toBeDefined();
+
+    await click(byTestId("create-card-done"));
+    expect((byTestId("card-generated-avatar") as HTMLImageElement).src).toStartWith(
+      "data:image/svg+xml",
+    );
+    expect(maybeByTestId("screen-home")).toBeDefined();
+  });
+
+  test("submits a valid form without clicking its action button", async () => {
+    localStorage.clear();
+    await mount();
+    await waitFor(
+      () => maybeByTestId("card-generated-avatar") !== undefined,
+      "Generated avatar did not become ready",
+    );
+    await type(byTestId("create-card-name") as HTMLInputElement, "Keyboard");
+    const form = byTestId("create-card-sheet");
+    expect(form).toBeInstanceOf(HTMLFormElement);
+    await act(async () => {
+      (form as HTMLFormElement).requestSubmit();
+      await tick();
+    });
+
+    expect(maybeByTestId("create-card-progress")).toBeDefined();
+  });
+
+  test("regenerates the avatar by rotating the card keypair", async () => {
+    localStorage.clear();
+    await mount();
+    await waitFor(() => maybeByTestId("card-generated-avatar") !== undefined, "Avatar not ready");
+    const firstAvatar = (byTestId("card-generated-avatar") as HTMLImageElement).src;
+
+    await click(byTestId("create-card-avatar-random"));
+    await waitFor(
+      () =>
+        (maybeByTestId("card-generated-avatar") as HTMLImageElement | undefined)?.src !==
+        firstAvatar,
+      "Avatar and keypair were not regenerated",
+    );
+    await type(byTestId("create-card-name") as HTMLInputElement, "Rotated");
+    await click(byTestId("create-card-submit"));
+    await act(async () => void (await tick(700)));
+    await click(byTestId("create-card-done"));
+
+    expect(loadWalletState().state.cards[0]?.identity?.publicKey).toBeDefined();
+    expect((byTestId("card-generated-avatar") as HTMLImageElement).src).not.toBe(firstAvatar);
+  });
+
+  test("offers only random generation and image upload avatar actions", async () => {
+    localStorage.clear();
+    await mount();
+
+    expect(byTestId("create-card-avatar-random")).toBeDefined();
+    expect(byTestId("create-card-avatar-upload")).toBeDefined();
+    expect(document.querySelectorAll('[data-testid^="create-card-avatar-"]').length).toBe(2);
+  });
+
+  test("previews an uploaded avatar image", async () => {
+    localStorage.clear();
+    await mount();
+    const input = byTestId("create-card-avatar-upload") as HTMLInputElement;
+
+    await upload(input, new File(["image"], "avatar.png", { type: "image/png" }));
+
+    await waitFor(() => maybeByTestId("card-uploaded-avatar") !== undefined, "Upload not shown");
+    expect((byTestId("card-uploaded-avatar") as HTMLImageElement).src).toStartWith(
+      "data:image/png;base64,",
+    );
+    expect(byTestId("card-uploaded-avatar").style.borderRadius).toBe("30%");
+  });
+
   test("shows honest initial copy without protocol or payment jargon", async () => {
     await mount();
 
+    const avatar = byTestId("card-custom-avatar");
+    expect(avatar.style.display).toBe("inline-flex");
+    expect(avatar.style.alignItems).toBe("center");
+    expect(avatar.style.justifyContent).toBe("center");
     expect(maybeByText("Wallet")).toBeDefined();
     expect(maybeByText("Connected accounts")).toBeDefined();
     expect(maybeByText("Accounts shown on this card")).toBeDefined();
@@ -187,6 +325,7 @@ describe("honest client-only wallet", () => {
       "#/wallet",
       "#/people",
       "#/activity",
+      "#/tools/cloak",
       "#/settings",
       "#/cards/c1",
       "#/people/p1",
@@ -196,6 +335,7 @@ describe("honest client-only wallet", () => {
       "#/settings?sheet=backup",
       "#/settings?sheet=restore",
       "#/settings?sheet=help",
+      "#/settings?sheet=reset",
       "#/cards/c1?sheet=share",
       "#/cards/c1?sheet=edit",
       "#/wallet?card=c1&sheet=create",
@@ -214,9 +354,11 @@ describe("honest client-only wallet", () => {
     expect(window.location.hash).toBe("#/people");
     expect(maybeByText("People")).toBeDefined();
 
-    await clickText("Activity");
-    expect(window.location.hash).toBe("#/activity");
-    expect(maybeByText("Everything that happened, in plain English")).toBeDefined();
+    await clickText("Tools");
+    expect(window.location.hash).toBe("#/tools/encrypt");
+    expect(
+      maybeByText("Encrypt, decrypt, cloak, sign, and verify—right on this device"),
+    ).toBeDefined();
 
     await clickText("Settings");
     expect(window.location.hash).toBe("#/settings");
@@ -224,6 +366,170 @@ describe("honest client-only wallet", () => {
 
     await clickText("Wallet");
     expect(window.location.hash).toBe("#/wallet");
+  });
+
+  test("activates whichever card moves to the front of the carousel", async () => {
+    await mount();
+    const next = SEED_CARDS[1];
+    if (next === undefined) throw new Error("Expected another seeded card");
+
+    await click(byTestId(`home-card-indicator-${next.id}`));
+
+    expect(window.location.hash).toBe(`#/wallet?card=${next.id}`);
+    expect(loadWalletState().state.activeId).toBe(next.id);
+    expect(byTestId(`home-card-${next.id}`).textContent).toContain("ACTIVE");
+  });
+
+  test("finds and activates identities from their public profile fields", async () => {
+    await mount();
+
+    await click(byTestId("home-search-identities"));
+    const search = byTestId("home-identity-search-input") as HTMLInputElement;
+    expect(search.placeholder).toBe(`Search ${SEED_CARDS.length} identities`);
+    await type(search, "professional");
+
+    expect(maybeByTestId("home-identity-search-result-c1")).toBeUndefined();
+    await click(byTestId("home-identity-search-result-c2"));
+    expect(loadWalletState().state.activeId).toBe("c2");
+    expect(window.location.hash).toBe("#/wallet?card=c2");
+    expect(maybeByTestId("home-identity-search")).toBeUndefined();
+  });
+
+  test("copies encrypted tool output", async () => {
+    const identity = await generateIdentityKeyPair();
+    const initial = createTestWalletState();
+    expect(
+      saveWalletState({
+        ...initial,
+        cards: initial.cards.map((card, index) => (index === 0 ? { ...card, identity } : card)),
+      }),
+    ).toEqual({ ok: true });
+    await mount("#/tools/encrypt");
+    await type(byTestId("tools-recipient") as HTMLInputElement, identity.publicKey);
+    await type(byTestId("tools-input") as HTMLTextAreaElement, "secret");
+    await click(byTestId("tools-run"));
+    await click(byTestId("tools-copy"));
+    expect(await navigator.clipboard.readText()).toContain('"mode":"nip44"');
+    expect(maybeByText("Output copied")).toBeDefined();
+  });
+
+  test("autocompletes recipient keys from contacts and the user's cards", async () => {
+    const initial = createTestWalletState();
+    const firstCard = initial.cards[0];
+    const firstContact = initial.contacts[0];
+    if (firstCard === undefined || firstContact === undefined)
+      throw new Error("Expected seeded recipients");
+    const cardPublicKey = "a".repeat(64);
+    const contactPublicKey = "b".repeat(64);
+    saveWalletState({
+      ...initial,
+      cards: [
+        {
+          ...firstCard,
+          identity: { publicKey: cardPublicKey, privateKey: "c".repeat(64) },
+        },
+        ...initial.cards.slice(1),
+      ],
+      contacts: [{ ...firstContact, npub: contactPublicKey }, ...initial.contacts.slice(1)],
+    });
+    await mount("#/tools/encrypt");
+    const input = byTestId("tools-recipient") as HTMLInputElement;
+
+    await act(async () => input.focus());
+    await type(input, "aria");
+    expect(maybeByTestId("tools-recipient-option-contact-p1")).toBeDefined();
+    expect(maybeByTestId("tools-recipient-option-card-c1")).toBeUndefined();
+    await click(byTestId("tools-recipient-option-contact-p1"));
+    expect(input.value).toBe(contactPublicKey);
+
+    await act(async () => input.focus());
+    await type(input, "Everyday");
+    await click(byTestId("tools-recipient-option-card-c1"));
+    expect(input.value).toBe(cardPublicKey);
+  });
+
+  test("cloaks, copies, and reveals a password-protected message", async () => {
+    await mount("#/tools/cloak");
+    expect(byTestId("tools-operation-cloak").getAttribute("aria-pressed")).toBe("true");
+    expect(byTestId("tools-operation-cloak").querySelector("svg")).not.toBeNull();
+
+    await type(byTestId("cloak-secret") as HTMLTextAreaElement, "Meet by the old bridge at six.");
+    await type(byTestId("cloak-cover") as HTMLTextAreaElement, "Dinner is still on tonight");
+    await type(byTestId("cloak-password") as HTMLInputElement, "correct horse");
+    expect(byTestId("cloak-run").querySelector("svg")).not.toBeNull();
+    await click(byTestId("cloak-run"));
+    await waitFor(
+      () => maybeByTestId("cloak-result") !== undefined,
+      "Cloaked result did not appear",
+    );
+
+    const cloaked = (byTestId("cloak-output") as HTMLTextAreaElement).value;
+    expect(cloaked).not.toBe("Dinner is still on tonight");
+    expect(byTestId("cloak-copy").querySelector("svg")).not.toBeNull();
+    await click(byTestId("cloak-copy"));
+    expect(await navigator.clipboard.readText()).toBe(cloaked);
+    expect(maybeByText("Cloaked message copied")).toBeDefined();
+
+    await click(byTestId("cloak-mode-reveal"));
+    await type(byTestId("cloak-input") as HTMLTextAreaElement, cloaked);
+    await type(byTestId("cloak-password") as HTMLInputElement, "correct horse");
+    await click(byTestId("cloak-run"));
+    await waitFor(
+      () =>
+        (maybeByTestId("cloak-output") as HTMLTextAreaElement | undefined)?.value ===
+        "Meet by the old bridge at six.",
+      "Hidden message did not appear",
+    );
+    expect((byTestId("cloak-output") as HTMLTextAreaElement).value).toBe(
+      "Meet by the old bridge at six.",
+    );
+  });
+
+  test("replaces a stale Cloak result with an inline validation error", async () => {
+    await mount("#/tools/cloak");
+    await type(byTestId("cloak-secret") as HTMLTextAreaElement, "Bring snacks");
+    await type(byTestId("cloak-cover") as HTMLTextAreaElement, "Movie night starts soon");
+    await click(byTestId("cloak-run"));
+    await waitFor(
+      () => maybeByTestId("cloak-result") !== undefined,
+      "Cloaked result did not appear",
+    );
+    expect(byTestId("cloak-result").textContent).toContain("not password protected");
+
+    await type(byTestId("cloak-secret") as HTMLTextAreaElement, "");
+    await click(byTestId("cloak-run"));
+    await waitFor(() => maybeByTestId("cloak-error") !== undefined, "Cloak error did not appear");
+    expect(byTestId("cloak-error").textContent).toContain("Enter the message you want to hide");
+    expect(maybeByTestId("cloak-result")).toBeUndefined();
+  });
+
+  test("signs profile text and renders its verification details", async () => {
+    const identity = await generateIdentityKeyPair();
+    const initial = createTestWalletState();
+    expect(
+      saveWalletState({
+        ...initial,
+        cards: initial.cards.map((card, index) => (index === 0 ? { ...card, identity } : card)),
+      }),
+    ).toEqual({ ok: true });
+    await mount("#/tools/encrypt");
+    await click(byTestId("tools-operation-sign"));
+    expect(window.location.hash).toBe("#/tools/sign");
+    await type(byTestId("tools-input") as HTMLTextAreaElement, "verify me");
+    await click(byTestId("tools-run"));
+    const signature = (byTestId("tools-output") as HTMLTextAreaElement).value;
+    expect(JSON.parse(signature)).toMatchObject({
+      version: 1,
+      text: "verify me",
+      profile: { publicKey: identity.publicKey },
+    });
+
+    await click(byTestId("tools-operation-verify"));
+    expect(window.location.hash).toBe("#/tools/verify");
+    await type(byTestId("tools-input") as HTMLTextAreaElement, signature);
+    await click(byTestId("tools-run"));
+    expect(byTestId("tools-verification").textContent).toContain("Signature verified");
+    expect(byTestId("tools-verified-text").textContent).toBe("verify me");
   });
 
   test("connect account exposes GitHub verification and keeps other services unavailable", async () => {
@@ -238,7 +544,7 @@ describe("honest client-only wallet", () => {
     expect(maybeByText("Confirm your GitHub profile")).toBeDefined();
     await type(byTestId("connect-github-username") as HTMLInputElement, "octocat");
     await click(byTestId("connect-github-create-code"));
-    expect(byTestId("connect-github-code").textContent).toMatch(/kc1\.[A-Za-z0-9_-]+\./u);
+    expect(byTestId("connect-github-code").textContent).toMatch(/kc1\.[A-Za-z0-9_-]+/u);
     expect(byTestId("connect-github-settings").getAttribute("href")).toBe(
       "https://github.com/settings/profile",
     );
@@ -259,7 +565,7 @@ describe("honest client-only wallet", () => {
   });
 
   test("copies a card's public key from its details", async () => {
-    const initial = createInitialWalletState();
+    const initial = createTestWalletState();
     const card = initial.cards[0];
     if (card === undefined) throw new Error("Initial wallet has no card");
     const identity = await generateIdentityKeyPair();
@@ -309,11 +615,13 @@ describe("honest client-only wallet", () => {
 
     await click(buttonByLabel("Edit Everyday"));
     expect(window.location.hash).toBe("#/cards/c1?sheet=edit");
-    const name = document.querySelector<HTMLInputElement>("input");
+    const name = document.querySelector<HTMLInputElement>('[data-testid="edit-card-name"]');
     const bio = document.querySelector<HTMLTextAreaElement>("textarea");
     if (name === null || bio === null) throw new Error("Missing edit fields");
     await type(name, "Main");
     await type(bio, "A locally saved profile");
+    await click(byTestId("edit-card-avatar-remove"));
+    expect(maybeByTestId("card-generated-avatar")).toBeDefined();
     await clickText("Save changes");
 
     expect(window.location.hash).toBe("#/cards/c1");
@@ -323,11 +631,13 @@ describe("honest client-only wallet", () => {
     const disconnect = buttonContaining("Disconnect");
     await click(disconnect);
     expect(maybeByText("X disconnected")).toBeDefined();
-    expect(maybeByText("@finnriver")).toBeUndefined();
+    expect(maybeByTestId("card-account-twitter")).toBeUndefined();
+    expect(maybeByText("@finnriver")).toBeDefined();
 
     const saved = loadWalletState();
     expect(saved.ok).toBe(true);
     expect(saved.state.cards.find((card) => card.id === "c1")?.name).toBe("Main");
+    expect(saved.state.cards.find((card) => card.id === "c1")?.avatar).toBe("");
     expect(saved.state.cards.find((card) => card.id === "c1")?.proofs).not.toContainEqual({
       provider: "twitter",
       username: "@finnriver",
@@ -336,7 +646,8 @@ describe("honest client-only wallet", () => {
     await mount("#/cards/c1");
     expect(maybeByText("Main")).toBeDefined();
     expect(maybeByText("A locally saved profile")).toBeDefined();
-    expect(maybeByText("@finnriver")).toBeUndefined();
+    expect(maybeByTestId("card-account-twitter")).toBeUndefined();
+    expect(maybeByText("@finnriver")).toBeDefined();
   });
 
   test("creates and selects a persisted card in the URL", async () => {
@@ -344,7 +655,7 @@ describe("honest client-only wallet", () => {
 
     await clickText("New card");
     expect(window.location.hash).toBe("#/wallet?card=c1&sheet=create");
-    const name = document.querySelector<HTMLInputElement>("input");
+    const name = document.querySelector<HTMLInputElement>('[data-testid="create-card-name"]');
     if (name === null) throw new Error("Missing card name field");
     await type(name, "Gaming");
     await clickText("Create card");
@@ -456,7 +767,7 @@ describe("honest client-only wallet", () => {
   });
 
   test("edits a contact while preserving immutable identity fields", async () => {
-    const before = createInitialWalletState().contacts.find((person) => person.id === "p1");
+    const before = createTestWalletState().contacts.find((person) => person.id === "p1");
     if (before === undefined) throw new Error("Missing seeded contact");
     await mount("#/people/p1");
 
@@ -578,11 +889,13 @@ describe("honest client-only wallet", () => {
     expect(maybeByText("1 contact selected")).toBeDefined();
     expect((byTestId("contact-select-p2") as HTMLInputElement).checked).toBe(true);
 
-    const initial = createInitialWalletState();
+    const initial = createTestWalletState();
     expect(saveWalletState({ ...initial, contacts: [] })).toEqual({ ok: true });
     await mount("#/people");
     expect(maybeByTestId("contacts-empty")).toBeDefined();
     expect(maybeByTestId("contacts-empty-add")).toBeDefined();
+    expect(maybeByTestId("contacts-manage")).toBeUndefined();
+    expect(maybeByTestId("contacts-import-profile")).toBeUndefined();
   });
 
   test("shares a card as a scannable, copyable, valid profile link", async () => {
@@ -618,6 +931,42 @@ describe("honest client-only wallet", () => {
     expect(window.location.hash).toBe("#/cards/c1");
   });
 
+  test("confirms and persists an application reset from settings", async () => {
+    const initial = createTestWalletState();
+    const firstCard = initial.cards[0];
+    if (firstCard === undefined) throw new Error("Initial wallet has no card");
+    expect(
+      saveWalletState({
+        ...initial,
+        cards: [{ ...firstCard, name: "Customized" }],
+        contacts: [],
+        activeId: firstCard.id,
+        theme: "dark",
+      }),
+    ).toEqual({ ok: true });
+    await mount("#/settings");
+
+    await clickText("Reset application");
+    expect(window.location.hash).toBe("#/settings?sheet=reset");
+    expect(maybeByText("Reset Keychain?")).toBeDefined();
+    expect(loadWalletState().state.cards[0]?.name).toBe("Customized");
+    await pointerDown(buttonByLabel("Close"));
+    expect(window.location.hash).toBe("#/settings");
+    expect(loadWalletState().state.contacts).toEqual([]);
+
+    await clickText("Reset application");
+    await click(byTestId("reset-confirm"));
+    expect(window.location.hash).toBe("#/settings");
+    const reset = loadWalletState();
+    expect(reset.ok).toBe(true);
+    expect(reset.state.cards).toEqual([]);
+    expect(reset.state.contacts).toEqual([]);
+    expect(reset.state.activeId).toBe("");
+    expect(reset.state.theme).toBe("system");
+
+    expect(maybeByText("Create a card")).toBeDefined();
+  });
+
   test("creates a real encrypted backup through the settings UI", async () => {
     await mount("#/settings");
 
@@ -650,7 +999,7 @@ describe("honest client-only wallet", () => {
   });
 
   test("rejects a wrong password then restores a real encrypted backup through the UI", async () => {
-    const initial = createInitialWalletState();
+    const initial = createTestWalletState();
     const first = initial.cards[0];
     if (first === undefined) throw new Error("Initial wallet has no card");
     const restoredState = {
@@ -660,7 +1009,9 @@ describe("honest client-only wallet", () => {
     };
     const password = "Restore This 9!";
     const contents = await createEncryptedBackup(walletSnapshot(restoredState), password);
-    const file = new File([contents], "keychain-backup.json", { type: "application/json" });
+    const file = new File([contents], "keychain-backup.json", {
+      type: "application/json",
+    });
 
     await mount("#/settings");
     await clickText("Restore a backup");
@@ -742,7 +1093,7 @@ describe("honest client-only wallet", () => {
 
   test("adds a contact by public key and rejects the same key twice", async () => {
     const identity = await generateIdentityKeyPair();
-    const initialContactCount = createInitialWalletState().contacts.length;
+    const initialContactCount = createTestWalletState().contacts.length;
     await mount("#/people?sheet=add");
 
     expect(maybeByText("Profile link or public key")).toBeDefined();
@@ -761,7 +1112,11 @@ describe("honest client-only wallet", () => {
     const saved = loadWalletState();
     const contact = saved.state.contacts.find((person) => person.npub === identity.publicKey);
     expect(saved.state.contacts).toHaveLength(initialContactCount + 1);
-    expect(contact).toMatchObject({ name: "Ada Key", proofs: [], npub: identity.publicKey });
+    expect(contact).toMatchObject({
+      name: "Ada Key",
+      proofs: [],
+      npub: identity.publicKey,
+    });
     const contactRoute = window.location.hash;
     await mount(contactRoute);
     expect(maybeByText("Ada Key")).toBeDefined();
@@ -778,7 +1133,7 @@ describe("honest client-only wallet", () => {
   });
 
   test("rejects an invalid public key without adding a contact", async () => {
-    const initialContactCount = createInitialWalletState().contacts.length;
+    const initialContactCount = createTestWalletState().contacts.length;
     await mount("#/people?sheet=add");
 
     await type(byTestId("add-contact-profile-link") as HTMLInputElement, "not-a-public-key");
@@ -791,7 +1146,7 @@ describe("honest client-only wallet", () => {
 
   test("rejects a public key already held by a legacy contact record", async () => {
     const identity = await generateIdentityKeyPair();
-    const initial = createInitialWalletState();
+    const initial = createTestWalletState();
     const existing = initial.contacts[0];
     if (existing === undefined) throw new Error("Initial wallet has no contacts");
     expect(

@@ -43,6 +43,11 @@ const CASES: readonly { readonly route: Route; readonly hash: string }[] = [
     hash: "#/people/person%20%2F%20%CE%BB?sheet=edit",
   },
   { route: { page: "activity" }, hash: "#/activity" },
+  { route: { page: "tools", operation: "encrypt" }, hash: "#/tools/encrypt" },
+  { route: { page: "tools", operation: "decrypt" }, hash: "#/tools/decrypt" },
+  { route: { page: "tools", operation: "sign" }, hash: "#/tools/sign" },
+  { route: { page: "tools", operation: "verify" }, hash: "#/tools/verify" },
+  { route: { page: "tools", operation: "cloak" }, hash: "#/tools/cloak" },
   { route: { page: "settings" }, hash: "#/settings" },
   { route: { page: "settings", sheet: "restore" }, hash: "#/settings?sheet=restore" },
 ];
@@ -61,6 +66,7 @@ describe("hash route parsing and formatting", () => {
     );
     expect(canonicalizeHashRoute("#/people?profile=abc")).toBe("#/people");
     expect(canonicalizeHashRoute("#/cards/c1?profile=abc")).toBe("#/cards/c1");
+    expect(canonicalizeHashRoute("#/tools")).toBe("#/tools/encrypt");
   });
 
   test("rejects malformed routes and invalid sheet combinations", () => {
@@ -81,6 +87,9 @@ describe("hash route parsing and formatting", () => {
       "#/people/p1?sheet=add",
       "#/people/p1?sheet=remove",
       "#/activity?sheet=help",
+      "#/tools/unknown",
+      "#/tools/encrypt/extra",
+      "#/tools/encrypt?sheet=help",
       "#/settings?sheet=create",
     ] as const;
 
@@ -117,6 +126,7 @@ describe("hash route parsing and formatting", () => {
       contactId: "p1",
     });
     expect(routeWithoutOverlay({ page: "activity" })).toBeNull();
+    expect(routeWithoutOverlay({ page: "tools", operation: "encrypt" })).toBeNull();
   });
 });
 

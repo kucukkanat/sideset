@@ -1,7 +1,8 @@
 export type WalletSheet = "create" | "connect";
 export type CardSheet = "edit" | "share" | "backup" | "connect";
 export type PersonSheet = "edit";
-export type SettingsSheet = "backup" | "restore" | "appearance" | "help";
+export type SettingsSheet = "backup" | "restore" | "appearance" | "help" | "reset";
+export type ToolOperation = "encrypt" | "decrypt" | "sign" | "verify" | "cloak";
 
 export type Route =
   | {
@@ -26,6 +27,7 @@ export type Route =
     }
   | { readonly page: "person"; readonly contactId: string; readonly sheet?: PersonSheet }
   | { readonly page: "activity" }
+  | { readonly page: "tools"; readonly operation: ToolOperation }
   | { readonly page: "settings"; readonly sheet?: SettingsSheet };
 
 export const DEFAULT_ROUTE: Route = { page: "wallet" };
@@ -138,7 +140,13 @@ const parsePerson = (contactId: string, params: URLSearchParams): Route => {
 };
 
 const parseSettings = (params: URLSearchParams): Route => {
-  const sheet = optionalSheet(params, ["backup", "restore", "appearance", "help"] as const);
+  const sheet = optionalSheet(params, [
+    "backup",
+    "restore",
+    "appearance",
+    "help",
+    "reset",
+  ] as const);
   if (sheet === undefined) return DEFAULT_ROUTE;
   return { page: "settings", ...(sheet === null ? {} : { sheet }) };
 };
@@ -171,6 +179,16 @@ export const parseHashRoute = (hash: string): Route => {
   }
   if (segments.length === 1 && segments[0] === "activity") {
     return hasSheet(params) ? DEFAULT_ROUTE : { page: "activity" };
+  }
+  if (segments.length === 1 && segments[0] === "tools")
+    return hasSheet(params) ? DEFAULT_ROUTE : { page: "tools", operation: "encrypt" };
+  if (segments.length === 2 && segments[0] === "tools") {
+    const operation = segments[1];
+    return !hasSheet(params) &&
+      operation !== undefined &&
+      isOneOf(operation, ["encrypt", "decrypt", "sign", "verify", "cloak"])
+      ? { page: "tools", operation }
+      : DEFAULT_ROUTE;
   }
   if (segments.length === 1 && segments[0] === "settings") return parseSettings(params);
   return DEFAULT_ROUTE;
@@ -223,6 +241,8 @@ export const formatHashRoute = (route: Route): string => {
     }
     case "activity":
       return "#/activity";
+    case "tools":
+      return `#/tools/${route.operation}`;
     case "settings": {
       const params = new URLSearchParams();
       if (route.sheet !== undefined) params.set("sheet", route.sheet);
@@ -249,6 +269,7 @@ export const routeWithoutOverlay = (route: Route): Route | null => {
     case "person":
       return route.sheet === undefined ? null : { page: "person", contactId: route.contactId };
     case "activity":
+    case "tools":
       return null;
   }
 };

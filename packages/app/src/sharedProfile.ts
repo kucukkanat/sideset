@@ -1,5 +1,6 @@
 import type { Card, Contact, Proof, ProviderId } from "@keychain/core";
 import { verifySignedProof } from "./accountVerification.ts";
+import { isAvatar } from "./avatar.ts";
 
 export interface SharedProfile {
   readonly version: 1;
@@ -8,6 +9,8 @@ export interface SharedProfile {
   readonly publicKey?: string;
   readonly name: string;
   readonly handle: string;
+  readonly username?: string;
+  readonly email?: string;
   readonly avatar: string;
   readonly color: number;
   readonly bio: string;
@@ -23,6 +26,8 @@ export type SharedProfileResult =
   | { readonly ok: false; readonly reason: "invalid" | "unsupported" };
 
 type ShareableProfile = Pick<Card, "id" | "name" | "handle" | "avatar" | "color" | "bio"> & {
+  readonly username?: string;
+  readonly email?: string;
   readonly npub?: string;
   readonly identity?: Card["identity"];
   readonly proofs?: readonly Proof[];
@@ -52,7 +57,7 @@ const isBase64Url = (value: unknown): value is string =>
 
 export const parseEd25519PublicKey = (value: string): string | null => {
   const normalized = value.trim();
-  return normalized.length === 43 && isBase64Url(normalized) ? normalized : null;
+  return /^[0-9a-f]{64}$/u.test(normalized) ? normalized : null;
 };
 
 const isEd25519PublicKey = (value: string): boolean => parseEd25519PublicKey(value) !== null;
@@ -84,7 +89,7 @@ const isSharedProof = (value: unknown): value is Proof => {
     value.username.length <= 120 &&
     typeof value.verificationCode === "string" &&
     value.verificationCode.length > 0 &&
-    value.verificationCode.length <= 512
+    value.verificationCode.length <= 2_000
   );
 };
 
@@ -123,6 +128,8 @@ export const encodeSharedProfile = (profile: ShareableProfile): string => {
       ...(publicKey ? { publicKey } : {}),
       name: profile.name,
       handle: profile.handle,
+      ...(profile.username ? { username: profile.username } : {}),
+      ...(profile.email ? { email: profile.email } : {}),
       avatar: profile.avatar,
       color: profile.color,
       bio: profile.bio,
@@ -157,9 +164,13 @@ export const decodeSharedProfile = (encoded: string): SharedProfileResult => {
       value.name.trim().length === 0 ||
       value.name.length > 80 ||
       !isSharedHandle(value.handle) ||
+      (value.username !== undefined &&
+        (typeof value.username !== "string" || value.username.length > 80)) ||
+      (value.email !== undefined &&
+        (typeof value.email !== "string" || value.email.length > 254)) ||
       typeof value.avatar !== "string" ||
       value.avatar.trim().length === 0 ||
-      value.avatar.length > 16 ||
+      !isAvatar(value.avatar) ||
       typeof value.color !== "number" ||
       !Number.isInteger(value.color) ||
       typeof value.bio !== "string" ||
@@ -178,6 +189,8 @@ export const decodeSharedProfile = (encoded: string): SharedProfileResult => {
         ...(typeof publicKey === "string" ? { publicKey: publicKey.trim() } : {}),
         name: value.name.trim(),
         handle: value.handle.trim(),
+        ...(typeof value.username === "string" ? { username: value.username.trim() } : {}),
+        ...(typeof value.email === "string" ? { email: value.email.trim() } : {}),
         avatar: value.avatar.trim(),
         color: value.color,
         bio: value.bio,

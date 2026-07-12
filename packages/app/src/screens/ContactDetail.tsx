@@ -1,4 +1,5 @@
 import { type Contact, PROVIDER_META, paletteFor, proofVerificationUrl } from "@keychain/core";
+import { Trash2 } from "lucide-react";
 import { type ReactElement, type RefObject, useEffect, useRef, useState } from "react";
 import { BackIcon, CopyIcon, EditIcon, ProviderIcon, ShareIcon, TrashIcon } from "../icons.tsx";
 
@@ -257,7 +258,9 @@ export const ContactDetail = ({
             aria-labelledby="remove-contact-title"
             aria-describedby="remove-contact-description"
           >
-            <div className="contact-confirm-icon">🗑️</div>
+            <div className="contact-confirm-icon">
+              <Trash2 aria-hidden="true" size={38} />
+            </div>
             <h2 id="remove-contact-title">Remove {contact.name}?</h2>
             <p id="remove-contact-description">
               This removes the contact from this device. This can’t be undone.

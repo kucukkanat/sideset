@@ -6,17 +6,29 @@ import {
   greetingFor,
   PROVIDER_META,
   type Proof,
+  searchCards,
   signedDistance,
   wrapIndex,
 } from "@keychain/core";
-import { type MutableRefObject, type ReactElement, useRef, useState } from "react";
+import { Search, X } from "lucide-react";
+import {
+  type MutableRefObject,
+  type ReactElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import darkBrandLogo from "../../assets/brand/sideset-logo-dark.png";
+import lightBrandLogo from "../../assets/brand/sideset-logo-light.png";
 import type { ActivityItem } from "../activity.ts";
 import { ActivityRow } from "../components/ActivityRow.tsx";
+import { CardAvatar } from "../components/CardAvatar.tsx";
 import { CardFace } from "../components/CardFace.tsx";
 import { ComingSoon } from "../components/ComingSoon.tsx";
 import { CheckIcon, LinkIcon, PlusIcon, ProviderIcon } from "../icons.tsx";
 
-const CARD_W = 250;
+const CARD_W = 350;
 const CARD_H = 214;
 const CAR_EASE = "cubic-bezier(.34,1.06,.34,1)";
 
@@ -29,7 +41,6 @@ interface HomeProps {
   interactive: boolean;
   hideFrontCard: boolean;
   frontCardRef: MutableRefObject<HTMLDivElement | null>;
-  onActivate: (card: Card) => void;
   onOpenDetail: (id: string, el: HTMLElement | null) => void;
   onImport: () => void;
   onCreate: () => void;
@@ -48,7 +59,6 @@ export const Home = ({
   interactive,
   hideFrontCard,
   frontCardRef,
-  onActivate,
   onOpenDetail,
   onImport,
   onCreate,
@@ -58,10 +68,17 @@ export const Home = ({
   recentActivity,
 }: HomeProps): ReactElement => {
   const [drag, setDrag] = useState({ x: 0, dragging: false });
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchInput = useRef<HTMLInputElement | null>(null);
   const moved = useRef(false);
   const n = cards.length;
   const front = wrapIndex(carIndex, n);
   const pos = front + (drag.dragging ? dragFraction(drag.x) : 0);
+  const searchResults = useMemo(() => searchCards(cards, query), [cards, query]);
+  useEffect(() => {
+    if (searchOpen) searchInput.current?.focus();
+  }, [searchOpen]);
 
   // Swipe: lock to the dominant axis, rubber-band the drag, snap ±1 past 48px.
   const onCarStart = (e: React.PointerEvent): void => {
@@ -119,21 +136,88 @@ export const Home = ({
   return (
     <div data-testid="screen-home" className="scr screen">
       <div className="screen-hdr">
-        <div>
+        <div className="home-brand">
+          <div className="home-brand-lockup" role="img" aria-label="Sideset">
+            <img className="home-brand-logo home-brand-logo-light" src={lightBrandLogo} alt="" />
+            <img className="home-brand-logo home-brand-logo-dark" src={darkBrandLogo} alt="" />
+          </div>
           <div className="hdr-sub">{greetingFor(new Date().getHours())}</div>
-          <div className="hdr-title">Wallet</div>
         </div>
-        <button
-          type="button"
-          data-testid="home-import-profile"
-          aria-label="Import a profile"
-          className="round-btn press"
-          style={{ border: "none", ["--press" as string]: 0.9 }}
-          onClick={onImport}
-        >
-          <PlusIcon stroke="var(--kc-heading)" size={22} width={2.2} />
-        </button>
+        <div className="home-header-actions">
+          <button
+            type="button"
+            data-testid="home-search-identities"
+            aria-label={searchOpen ? "Close identity search" : "Search identities"}
+            aria-expanded={searchOpen}
+            className="round-btn press"
+            onClick={() => {
+              setSearchOpen((open) => !open);
+              setQuery("");
+            }}
+          >
+            {searchOpen ? (
+              <X aria-hidden="true" size={21} />
+            ) : (
+              <Search aria-hidden="true" size={21} />
+            )}
+          </button>
+          <button
+            type="button"
+            data-testid="home-import-profile"
+            aria-label="Import a profile"
+            className="round-btn press"
+            style={{ border: "none", ["--press" as string]: 0.9 }}
+            onClick={onImport}
+          >
+            <PlusIcon stroke="var(--kc-heading)" size={22} width={2.2} />
+          </button>
+        </div>
       </div>
+
+      {searchOpen && (
+        <div data-testid="home-identity-search" className="home-identity-search">
+          <div className="home-identity-search-input">
+            <Search aria-hidden="true" size={18} />
+            <input
+              data-testid="home-identity-search-input"
+              ref={searchInput}
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              placeholder={`Search ${cards.length} ${cards.length === 1 ? "identity" : "identities"}`}
+              aria-label="Search your identities"
+            />
+          </div>
+          {query.trim().length > 0 && (
+            <div
+              data-testid="home-identity-search-results"
+              className="home-identity-search-results"
+            >
+              {searchResults.length === 0 ? (
+                <div className="home-identity-search-empty">No identities found</div>
+              ) : (
+                searchResults.map((card) => (
+                  <button
+                    type="button"
+                    data-testid={`home-identity-search-result-${card.id}`}
+                    key={card.id}
+                    onClick={() => {
+                      onCarIndex(cards.indexOf(card));
+                      setSearchOpen(false);
+                      setQuery("");
+                    }}
+                  >
+                    <CardAvatar card={card} style={{ width: 38, height: 38 }} />
+                    <span>
+                      <strong>{card.name}</strong>
+                      <small>{card.username || card.handle}</small>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* CARD CAROUSEL */}
       <div
@@ -171,15 +255,13 @@ export const Home = ({
                 onClick={(e) => {
                   if (moved.current) return;
                   if (!isFront) onCarIndex(i);
-                  else if (c.id === activeId) onOpenDetail(c.id, e.currentTarget);
-                  else onActivate(c);
+                  else onOpenDetail(c.id, e.currentTarget);
                 }}
                 onKeyDown={(event) => {
                   if (event.key !== "Enter" && event.key !== " ") return;
                   event.preventDefault();
                   if (!isFront) onCarIndex(i);
-                  else if (c.id === activeId) onOpenDetail(c.id, event.currentTarget);
-                  else onActivate(c);
+                  else onOpenDetail(c.id, event.currentTarget);
                 }}
                 style={{
                   position: "absolute",
@@ -354,7 +436,7 @@ export const Home = ({
           className="scr"
           style={{ display: "flex", gap: 12, overflowX: "auto", padding: "2px 24px 6px" }}
         >
-          {active.proofs.map((proof) => {
+          {(active.proofs ?? []).map((proof) => {
             const meta = PROVIDER_META[proof.provider];
             return (
               <button

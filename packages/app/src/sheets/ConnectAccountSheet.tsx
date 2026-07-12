@@ -5,7 +5,7 @@ import {
   PROVIDER_META,
   type ProviderId,
 } from "@keychain/core";
-import { type ReactElement, useState } from "react";
+import { type FormEvent, type ReactElement, useState } from "react";
 import {
   createGithubVerificationCode,
   generateIdentityKeyPair,
@@ -101,9 +101,19 @@ export const ConnectAccountSheet = ({
   const copyCode = async (): Promise<void> => {
     if (verificationCode !== null) await copyText(verificationCode);
   };
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    if (step === "github" || step === "code") {
+      void (verificationCode === null ? createCode() : checkGithub());
+    }
+  };
 
   return (
-    <div data-testid="connect-account-sheet" style={{ animation: "riseIn .4s ease" }}>
+    <form
+      data-testid="connect-account-sheet"
+      onSubmit={submit}
+      style={{ animation: "riseIn .4s ease" }}
+    >
       {step === "providers" && (
         <>
           <div style={{ textAlign: "center" }}>
@@ -114,7 +124,7 @@ export const ConnectAccountSheet = ({
             {PROOF_ORDER.map((provider) => {
               const meta = PROVIDER_META[provider];
               const available = availableProviders.includes(provider);
-              const existing = card.proofs.find((proof) => proof.provider === provider);
+              const existing = (card.proofs ?? []).find((proof) => proof.provider === provider);
               const connected = existing?.verificationCode !== undefined;
               const needsUpgrade = existing !== undefined && !connected;
               return (
@@ -205,7 +215,14 @@ export const ConnectAccountSheet = ({
                 }}
               >
                 <div className="sec-label">Your signed verification code</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginTop: 7,
+                  }}
+                >
                   <code
                     style={{
                       flex: 1,
@@ -257,7 +274,7 @@ export const ConnectAccountSheet = ({
             </div>
           )}
           <button
-            type="button"
+            type="submit"
             data-testid={
               verificationCode === null ? "connect-github-create-code" : "connect-github-check"
             }
@@ -318,6 +335,6 @@ export const ConnectAccountSheet = ({
           </button>
         </div>
       )}
-    </div>
+    </form>
   );
 };

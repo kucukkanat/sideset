@@ -21,8 +21,8 @@ describe("GitHub account verification helpers", () => {
   test("creates a compact signed code that verifies with the public key", async () => {
     const identity = await generateIdentityKeyPair();
     const code = await createGithubVerificationCode(identity, "octocat");
-    expect(code).toMatch(/^kc1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u);
-    expect(code.length).toBeLessThan(160);
+    expect(code).toMatch(/^kc1\.[A-Za-z0-9_-]+$/u);
+    expect(code.length).toBeLessThan(800);
     expect(
       await verifySignedProof(code, {
         provider: "github",

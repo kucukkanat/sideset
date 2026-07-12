@@ -1,5 +1,18 @@
 import { type Card, paletteFor } from "@keychain/core";
+import {
+  Bell,
+  CircleHelp,
+  Cloud,
+  Download,
+  History,
+  type LucideIcon,
+  Palette,
+  ScanFace,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 import type { ReactElement } from "react";
+import { CardAvatar } from "../components/CardAvatar.tsx";
 import { ComingSoon } from "../components/ComingSoon.tsx";
 import { ChevronIcon } from "../icons.tsx";
 
@@ -13,11 +26,14 @@ interface SettingsProps {
   onBackup: () => void;
   onRestore: () => void;
   onHelp: () => void;
+  onReset: () => void;
+  onActivity: () => void;
 }
 
 interface RowBase {
-  readonly icon: string;
+  readonly icon: LucideIcon;
   readonly bg: string;
+  readonly fg: string;
   readonly label: string;
 }
 
@@ -46,6 +62,8 @@ export const Settings = ({
   onBackup,
   onRestore,
   onHelp,
+  onReset,
+  onActivity,
 }: SettingsProps): ReactElement => {
   const pal = paletteFor(active.color);
   const groups: readonly { readonly title: string; readonly rows: readonly RowDef[] }[] = [
@@ -53,21 +71,24 @@ export const Settings = ({
       title: "Security",
       rows: [
         {
-          icon: "🙂",
+          icon: ScanFace,
           bg: "#EAF0FF",
+          fg: "#244BB5",
           label: "Approve with Face ID",
           disabled: true,
         },
         {
-          icon: "🛡️",
+          icon: ShieldCheck,
           bg: "#E9F7EC",
+          fg: "#18713B",
           label: "Export a backup",
           detail: "This device",
           onTap: onBackup,
         },
         {
-          icon: "📥",
+          icon: Download,
           bg: "#FFF6DB",
+          fg: "#805400",
           label: "Restore a backup",
           onTap: onRestore,
         },
@@ -77,8 +98,9 @@ export const Settings = ({
       title: "Cloud",
       rows: [
         {
-          icon: "☁️",
+          icon: Cloud,
           bg: "#E8F0FF",
+          fg: "#244BB5",
           label: "Sync with iCloud",
           disabled: true,
         },
@@ -88,23 +110,46 @@ export const Settings = ({
       title: "Preferences",
       rows: [
         {
-          icon: "🔔",
+          icon: Bell,
           bg: "#FFF6DB",
+          fg: "#805400",
           label: "Notifications",
           disabled: true,
         },
         {
-          icon: "🎨",
+          icon: Palette,
           bg: "#FCEDE7",
+          fg: "#A33A21",
           label: "Appearance",
           detail: themeLabel(theme),
           onTap: onAppearance,
         },
         {
-          icon: "❓",
+          icon: CircleHelp,
           bg: "#EFEAF7",
+          fg: "#67409B",
           label: "Help & support",
           onTap: onHelp,
+        },
+      ],
+    },
+    {
+      title: "Application",
+      rows: [
+        {
+          icon: History,
+          bg: "#EFEAF7",
+          fg: "#67409B",
+          label: "Activity",
+          onTap: onActivity,
+        },
+        {
+          icon: Trash2,
+          bg: "#FDECE7",
+          fg: "#AE321F",
+          label: "Reset application",
+          detail: "Erase local data",
+          onTap: onReset,
         },
       ],
     },
@@ -151,7 +196,7 @@ export const Settings = ({
               boxShadow: `0 6px 14px -6px ${pal.shadow}`,
             }}
           >
-            {active.avatar}
+            <CardAvatar card={active} style={{ width: 48, height: 48 }} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 17, fontWeight: 800 }}>{active.name}</div>
@@ -180,12 +225,13 @@ export const Settings = ({
           <div data-testid={`settings-group-${group.title.toLowerCase()}-list`} className="panel">
             {group.rows.map((row) => {
               const disabled = row.disabled === true;
+              const Icon = row.icon;
               return (
                 <button
                   type="button"
                   key={row.label}
                   data-testid={`settings-${row.label.toLowerCase().replaceAll(" ", "-")}`}
-                  className={disabled ? "row" : "row press"}
+                  className={disabled ? "row row-disabled" : "row press"}
                   disabled={disabled}
                   aria-disabled={disabled}
                   onClick={disabled ? undefined : row.onTap}
@@ -197,7 +243,6 @@ export const Settings = ({
                     background: "transparent",
                     textAlign: "left",
                     cursor: disabled ? "not-allowed" : "pointer",
-                    opacity: disabled ? 0.55 : 1,
                     ["--press" as string]: 0.99,
                   }}
                 >
@@ -205,13 +250,14 @@ export const Settings = ({
                     className="row-icon"
                     style={{
                       background: row.bg,
+                      color: row.fg,
                       width: 34,
                       height: 34,
                       borderRadius: 10,
                       fontSize: 17,
                     }}
                   >
-                    {row.icon}
+                    <Icon aria-hidden="true" size={18} strokeWidth={2.1} />
                   </span>
                   <span
                     data-theme-text="primary"

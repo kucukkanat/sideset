@@ -20,6 +20,7 @@
   --kc-warning-text: #8a6d3b;
   --kc-error: #d14b2e;
   --kc-accent: #e8502a;
+  --kc-top-inset: calc(env(safe-area-inset-top) + 8px);
 }
 html,
 body,
@@ -163,7 +164,7 @@ a:focus-visible,
   inset: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: calc(26px + env(safe-area-inset-top)) 0 calc(118px + env(safe-area-inset-bottom));
+  padding: calc(26px + var(--kc-top-inset)) 0 calc(118px + env(safe-area-inset-bottom));
   animation: fadeIn 0.35s ease;
 }
 .screen-hdr {
@@ -1667,7 +1668,7 @@ a:focus-visible,
 /* Detail screens (card + contact) */
 .detail-hero,
 .flip-detail-hero {
-  padding: calc(26px + env(safe-area-inset-top)) 20px 26px;
+  padding: calc(26px + var(--kc-top-inset)) 20px 26px;
 }
 .detail-hero {
   position: relative;

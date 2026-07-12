@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { SEED_CARDS, SEED_CONTACTS } from "@keychain/core";
+import { nip19 } from "nostr-tools";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "../src/App.tsx";
@@ -588,11 +589,12 @@ describe("honest client-only wallet", () => {
 
     await mount(`#/cards/${card.id}`);
 
+    const npub = nip19.npubEncode(identity.publicKey);
     const copyPublicKey = byTestId("card-detail-copy-public-key");
-    expect(copyPublicKey.textContent).toContain(identity.publicKey);
+    expect(copyPublicKey.textContent).toContain(npub);
     await click(copyPublicKey);
 
-    expect(await navigator.clipboard.readText()).toBe(identity.publicKey);
+    expect(await navigator.clipboard.readText()).toBe(npub);
     expect(maybeByText("Public key copied")).toBeDefined();
   });
 
@@ -610,20 +612,23 @@ describe("honest client-only wallet", () => {
 
     await mount(`#/cards/${card.id}`);
 
+    const nsec = nip19.nsecEncode(
+      Uint8Array.from(identity.privateKey.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16)),
+    );
     const accounts = byTestId("card-detail-accounts");
     const keys = byTestId("card-detail-keys");
     expect(accounts.compareDocumentPosition(keys) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
-    expect(document.body.textContent).not.toContain(identity.privateKey);
+    expect(document.body.textContent).not.toContain(nsec);
 
     await pointerDown(byTestId("card-detail-reveal-private-key"));
     await act(async () => void (await tick(1_250)));
-    expect(byTestId("card-detail-private-key").textContent).toBe(identity.privateKey);
+    expect(byTestId("card-detail-private-key").textContent).toBe(nsec);
 
     await click(byTestId("card-detail-arm-copy-private-key"));
-    expect(await navigator.clipboard.readText()).not.toBe(identity.privateKey);
+    expect(await navigator.clipboard.readText()).not.toBe(nsec);
     await click(byTestId("card-detail-confirm-copy-private-key"));
 
-    expect(await navigator.clipboard.readText()).toBe(identity.privateKey);
+    expect(await navigator.clipboard.readText()).toBe(nsec);
     expect(maybeByText("Private key copied — keep it secret")).toBeDefined();
     expect(maybeByTestId("card-detail-private-key")).toBeUndefined();
   });

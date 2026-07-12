@@ -17,6 +17,7 @@ import {
   ShareIcon,
   ShieldIcon,
 } from "../icons.tsx";
+import { nostrDisplayKeys } from "../nostrKeys.ts";
 
 interface CardDetailProps {
   card: Card;
@@ -52,6 +53,7 @@ export const CardDetail = ({
 }: CardDetailProps): ReactElement => {
   const pal = paletteFor(card.color);
   const identity = card.identity;
+  const displayKeys = identity === undefined ? undefined : nostrDisplayKeys(identity);
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [isHoldingVault, setIsHoldingVault] = useState(false);
   const [isCopyArmed, setIsCopyArmed] = useState(false);
@@ -311,7 +313,7 @@ export const CardDetail = ({
         </div>
       </div>
 
-      {identity !== undefined && (
+      {displayKeys !== undefined && (
         <section data-testid="card-detail-keys" className="card-keys">
           <div className="card-keys-heading">
             <div>
@@ -328,10 +330,10 @@ export const CardDetail = ({
             type="button"
             aria-label={`Copy ${card.name}'s public key`}
             className="card-key-row press"
-            onClick={() => onCopyPublicKey(identity.publicKey)}
+            onClick={() => onCopyPublicKey(displayKeys.publicKey)}
           >
             <div className="card-key-kind">Public key</div>
-            <code>{identity.publicKey}</code>
+            <code>{displayKeys.publicKey}</code>
             <div className="card-key-action">
               Safe to share <CopyIcon />
             </div>
@@ -349,7 +351,7 @@ export const CardDetail = ({
             {isVaultOpen ? (
               <>
                 <code data-testid="card-detail-private-key" className="key-vault-secret">
-                  {identity.privateKey}
+                  {displayKeys.privateKey}
                 </code>
                 <div className="key-vault-timer">Auto-seals in 30 seconds</div>
                 <div className="key-vault-actions">
@@ -367,7 +369,7 @@ export const CardDetail = ({
                       type="button"
                       className="key-vault-copy press"
                       onClick={() => {
-                        onCopyPrivateKey(identity.privateKey);
+                        onCopyPrivateKey(displayKeys.privateKey);
                         sealVault();
                       }}
                     >

@@ -69,6 +69,12 @@ describe("PWA assets", () => {
     expect(html).not.toContain("fonts.gstatic.com");
   });
 
+  test("keeps standalone content clear of the iOS status bar", async () => {
+    const styles = await Bun.file(new URL("../src/styles.css", import.meta.url)).text();
+    expect(styles).toContain("--kc-top-inset: calc(env(safe-area-inset-top) + 8px)");
+    expect(styles.match(/calc\(26px \+ var\(--kc-top-inset\)\)/gu)).toHaveLength(2);
+  });
+
   test("ships transparent light, dark, mark, and favicon PNGs", async () => {
     const assets = [
       "../assets/brand/sideset-logo-light.png",

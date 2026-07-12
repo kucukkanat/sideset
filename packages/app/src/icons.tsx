@@ -6,7 +6,6 @@ import {
   Clock3,
   Copy,
   Link,
-  MessageSquare,
   Pencil,
   Plus,
   Search,
@@ -77,10 +76,6 @@ export const ChevronIcon = ({ size = 18 }: { size?: number }): ReactElement => (
 
 export const CopyIcon = (): ReactElement => (
   <Copy aria-hidden="true" color="#C9BBA6" size={18} strokeWidth={2} />
-);
-
-export const MessageIcon = (): ReactElement => (
-  <MessageSquare aria-hidden="true" color="#fff" size={19} strokeWidth={2} />
 );
 
 export const PersonIcon = (): ReactElement => (

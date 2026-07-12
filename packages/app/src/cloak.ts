@@ -1,7 +1,7 @@
 export const MAX_CLOAK_SECRET_LENGTH = 10_000;
 export const MAX_CLOAK_COVER_LENGTH = 20_000;
 export const MAX_CLOAKED_MESSAGE_LENGTH = 1_000_000;
-export const MIN_CLOAK_PASSWORD_LENGTH = 8;
+const MIN_CLOAK_PASSWORD_LENGTH = 8;
 
 const INVISIBLE_CHARACTERS = /(?:\u200c|\u200d|\u2061|\u2062|\u2063|\u2064)/gu;
 
@@ -17,7 +17,7 @@ const createStegCloak = async (protectedMessage: boolean) => {
   return new StegCloak(protectedMessage, protectedMessage);
 };
 
-export type CloakFailure =
+type CloakFailure =
   | { readonly code: "empty-secret"; readonly message: string }
   | { readonly code: "secret-too-long"; readonly message: string }
   | { readonly code: "short-cover"; readonly message: string }

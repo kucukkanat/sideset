@@ -20,7 +20,7 @@ export type GithubVerificationResult =
         | "invalid-code";
     };
 
-export type SignedProofEnvelope = {
+type SignedProofEnvelope = {
   readonly version: 1;
   readonly event: NostrEvent;
 };
@@ -30,9 +30,6 @@ const GITHUB_USERNAME = /^(?!-)[A-Za-z0-9-]{1,39}(?<!-)$/;
 export const isGithubUsername = (value: string): boolean => GITHUB_USERNAME.test(value.trim());
 
 export const githubProfileSettingsUrl = "https://github.com/settings/profile";
-
-export const githubProfileUrl = (username: string): string =>
-  `https://github.com/${encodeURIComponent(username.trim())}`;
 
 const toBase64Url = (bytes: Uint8Array): string => {
   let binary = "";
@@ -97,7 +94,7 @@ export const createGithubVerificationCode = async (
   return `kc1.${toBase64Url(new TextEncoder().encode(JSON.stringify(event)))}`;
 };
 
-export const parseSignedProof = (code: string): SignedProofEnvelope | null => {
+const parseSignedProof = (code: string): SignedProofEnvelope | null => {
   const parts = code.trim().split(".");
   if (parts.length !== 2 || parts[0] !== "kc1" || parts[1] === undefined) return null;
   const decoded = decodeJson(parts[1]);

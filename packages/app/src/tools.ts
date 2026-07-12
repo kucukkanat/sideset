@@ -136,7 +136,7 @@ export const decryptWithPassphrase = async (
   return new Uint8Array(plain);
 };
 
-export type SignedProfile = {
+type SignedProfile = {
   /** Present only in legacy signed documents; local card labels are not public profile data. */
   readonly name?: string;
   readonly handle: string;

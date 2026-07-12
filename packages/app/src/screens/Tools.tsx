@@ -48,7 +48,7 @@ interface RecipientOption {
   readonly kind: "Contact" | "Your card";
 }
 
-export const recipientOptions = (
+const recipientOptions = (
   cards: readonly Card[],
   contacts: readonly Contact[],
   query: string,

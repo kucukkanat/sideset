@@ -2,7 +2,7 @@ import { type IdentityKeyPair, PALETTES, paletteFor } from "@keychain/core";
 import { RefreshCw, Upload } from "lucide-react";
 import { type FormEvent, type ReactElement, useEffect, useRef, useState } from "react";
 import { generateIdentityKeyPair } from "../accountVerification.ts";
-import { MAX_AVATAR_BYTES } from "../avatar.ts";
+import { readAvatarFile } from "../avatar.ts";
 import { CardAvatar } from "../components/CardAvatar.tsx";
 import { CheckIcon } from "../icons.tsx";
 
@@ -61,22 +61,11 @@ export const CreateSheet = ({
       setIsGeneratingIdentity(false);
     }
   };
-  const uploadAvatar = (file: File | undefined): void => {
+  const uploadAvatar = async (file: File | undefined): Promise<void> => {
     if (file === undefined) return;
-    if (!new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]).has(file.type)) {
-      onToast("Choose a JPEG, PNG, WebP, or GIF image");
-      return;
-    }
-    if (file.size > MAX_AVATAR_BYTES) {
-      onToast("Choose an image no larger than 4 MB");
-      return;
-    }
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") setAvatar(reader.result);
-    });
-    reader.addEventListener("error", () => onToast("Couldn't read that image"));
-    reader.readAsDataURL(file);
+    const result = await readAvatarFile(file);
+    if (result.ok) setAvatar(result.avatar);
+    else onToast(result.message);
   };
   const start = (): void => {
     if (!canCreate) {
@@ -177,7 +166,7 @@ export const CreateSheet = ({
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 data-testid="create-card-avatar-upload"
                 aria-label="Upload an avatar image"
-                onChange={(event) => uploadAvatar(event.currentTarget.files?.[0])}
+                onChange={(event) => void uploadAvatar(event.currentTarget.files?.[0])}
                 style={{ display: "none" }}
               />
             </label>

@@ -19,8 +19,6 @@ import {
   useRef,
   useState,
 } from "react";
-import darkBrandLogo from "../../assets/brand/sideset-logo-dark.png";
-import lightBrandLogo from "../../assets/brand/sideset-logo-light.png";
 import type { ActivityItem } from "../activity.ts";
 import { ActivityRow } from "../components/ActivityRow.tsx";
 import { CardAvatar } from "../components/CardAvatar.tsx";
@@ -31,6 +29,8 @@ import { CheckIcon, LinkIcon, PlusIcon, ProviderIcon } from "../icons.tsx";
 const CARD_W = 350;
 const CARD_H = 214;
 const CAR_EASE = "cubic-bezier(.34,1.06,.34,1)";
+const lightBrandLogo = "./assets/brand/sideset-logo-light.png";
+const darkBrandLogo = "./assets/brand/sideset-logo-dark.png";
 
 interface HomeProps {
   cards: readonly Card[];

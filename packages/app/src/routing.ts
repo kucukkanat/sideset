@@ -1,7 +1,7 @@
-export type WalletSheet = "create" | "connect";
-export type CardSheet = "edit" | "share" | "backup" | "connect";
-export type PersonSheet = "edit";
-export type SettingsSheet = "backup" | "restore" | "appearance" | "help" | "reset";
+type WalletSheet = "create" | "connect";
+type CardSheet = "edit" | "share" | "backup" | "connect";
+type PersonSheet = "edit";
+type SettingsSheet = "backup" | "restore" | "appearance" | "help" | "reset";
 export type ToolOperation = "encrypt" | "decrypt" | "sign" | "verify" | "cloak";
 
 export type Route =

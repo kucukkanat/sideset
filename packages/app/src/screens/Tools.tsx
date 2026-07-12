@@ -136,9 +136,11 @@ export const Tools = ({
         );
       if (operation === "decrypt") {
         const envelope = file === null ? source : bytesText(data);
-        const plain = symmetric
-          ? await decryptWithPassphrase(envelope, passphrase)
-          : decryptFromRecipient(envelope, identity);
+        const decryption = symmetric ? null : decryptFromRecipient(envelope, identity);
+        const plain =
+          decryption === null ? await decryptWithPassphrase(envelope, passphrase) : decryption.data;
+        if (decryption?.role === "sender")
+          onToast("You sent this message. NIP-44 lets both participants decrypt it.");
         setOutputBytes(plain);
         try {
           setOutput(bytesText(plain));

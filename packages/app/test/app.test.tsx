@@ -18,6 +18,7 @@ import {
   saveWalletState,
   walletSnapshot,
 } from "../src/storage.ts";
+import { encryptForRecipient, textBytes } from "../src/tools.ts";
 
 let container: HTMLDivElement | undefined;
 let root: Root | undefined;
@@ -452,6 +453,30 @@ describe("honest client-only wallet", () => {
     await click(byTestId("tools-copy"));
     expect(await navigator.clipboard.readText()).toContain('"mode":"nip44"');
     expect(maybeByText("Output copied")).toBeDefined();
+  });
+
+  test("notices when the sender decrypts their outgoing message", async () => {
+    const sender = await generateIdentityKeyPair();
+    const recipient = await generateIdentityKeyPair();
+    const initial = createTestWalletState();
+    expect(
+      saveWalletState({
+        ...initial,
+        cards: initial.cards.map((card, index) =>
+          index === 0 ? { ...card, identity: sender } : card,
+        ),
+      }),
+    ).toEqual({ ok: true });
+    const encrypted = encryptForRecipient(textBytes("secret"), sender, recipient.publicKey);
+
+    await mount("#/tools/decrypt");
+    await type(byTestId("tools-input") as HTMLTextAreaElement, encrypted);
+    await click(byTestId("tools-run"));
+
+    expect((byTestId("tools-output") as HTMLTextAreaElement).value).toBe("secret");
+    expect(
+      maybeByText("You sent this message. NIP-44 lets both participants decrypt it."),
+    ).toBeDefined();
   });
 
   test("autocompletes recipient keys from contacts and the user's cards", async () => {

@@ -90,7 +90,15 @@ export const encryptForRecipient = (
   } satisfies RecipientEnvelope);
 };
 
-export const decryptFromRecipient = (value: string, identity: IdentityKeyPair): Uint8Array => {
+export type RecipientDecryption = {
+  readonly data: Uint8Array;
+  readonly role: "recipient" | "sender";
+};
+
+export const decryptFromRecipient = (
+  value: string,
+  identity: IdentityKeyPair,
+): RecipientDecryption => {
   const envelope = JSON.parse(value) as RecipientEnvelope;
   const sender = nostrPublicKeyHex(envelope.sender);
   const recipient = nostrPublicKeyHex(envelope.recipient);
@@ -100,7 +108,12 @@ export const decryptFromRecipient = (value: string, identity: IdentityKeyPair): 
   if (sender !== identity.publicKey && recipient !== identity.publicKey)
     throw new Error("The active identity is not a participant in this envelope");
   const peer = sender === identity.publicKey ? recipient : sender;
-  return unb64(nip44.v2.decrypt(envelope.payload, nip44.v2.utils.getConversationKey(secret, peer)));
+  return {
+    data: unb64(
+      nip44.v2.decrypt(envelope.payload, nip44.v2.utils.getConversationKey(secret, peer)),
+    ),
+    role: recipient === identity.publicKey ? "recipient" : "sender",
+  };
 };
 
 export const encryptWithPassphrase = async (

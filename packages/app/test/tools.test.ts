@@ -26,8 +26,14 @@ describe("Nostr content tools", () => {
       sender: nip19.npubEncode(sender.publicKey),
       recipient: nip19.npubEncode(recipient.publicKey),
     });
-    expect(bytesText(decryptFromRecipient(encrypted, recipient))).toBe("private hello");
-    expect(bytesText(decryptFromRecipient(encrypted, sender))).toBe("private hello");
+    expect(decryptFromRecipient(encrypted, recipient)).toEqual({
+      data: textBytes("private hello"),
+      role: "recipient",
+    });
+    expect(decryptFromRecipient(encrypted, sender)).toEqual({
+      data: textBytes("private hello"),
+      role: "sender",
+    });
     expect(() => decryptFromRecipient(encrypted, generateNostrIdentity())).toThrow();
   });
 
@@ -42,7 +48,7 @@ describe("Nostr content tools", () => {
       sender: sender.publicKey,
       recipient: recipient.publicKey,
     });
-    expect(bytesText(decryptFromRecipient(legacy, recipient))).toBe("legacy hello");
+    expect(bytesText(decryptFromRecipient(legacy, recipient).data)).toBe("legacy hello");
   });
 
   test("rejects non-Nostr and mismatched identities", () => {

@@ -6,10 +6,12 @@
   "private": true,
   "scripts": {
     "dev": "bun index.html",
-    "build": "bun build index.html --outdir dist --minify"
+    "build": "bun scripts/build.ts",
+    "preview": "bun run build && bun scripts/preview.ts"
   },
   "dependencies": {
     "@keychain/core": "workspace:*",
+    "qr": "0.6.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+  "id": "./",
+  "name": "Keychain",
+  "short_name": "Keychain",
+  "description": "Keep the different parts of your life organized in simple profile cards.",
+  "start_url": "./#/wallet",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4efe8",
+  "theme_color": "#f4efe8",
+  "categories": ["utilities", "social"],
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

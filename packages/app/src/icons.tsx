@@ -1,20 +1,8 @@
 import { PROVIDER_META, type ProviderId } from "@keychain/core";
 import type { ReactElement } from "react";
 
-export const ScanIcon = (): ReactElement => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" role="img" aria-label="Scan">
-    <path
-      d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16"
-      stroke="#1B1917"
-      strokeWidth="2"
-      strokeLinecap="round"
-    />
-    <path d="M7 12h10" stroke="#E8502A" strokeWidth="2" strokeLinecap="round" />
-  </svg>
-);
-
 export const PlusIcon = ({
-  stroke = "#A08E78",
+  stroke = "currentColor",
   size = 22,
   width = 2.4,
 }: {
@@ -22,8 +10,16 @@ export const PlusIcon = ({
   size?: number;
   width?: number;
 }): ReactElement => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" role="img" aria-label="Add">
-    <path d="M12 5v14M5 12h14" stroke={stroke} strokeWidth={width} strokeLinecap="round" />
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    role="img"
+    aria-label="Add"
+    style={{ color: stroke }}
+  >
+    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth={width} strokeLinecap="round" />
   </svg>
 );
 
@@ -39,14 +35,34 @@ export const BackIcon = (): ReactElement => (
   </svg>
 );
 
-export const EditIcon = (): ReactElement => (
+export const EditIcon = ({ stroke = "#fff" }: { stroke?: string } = {}): ReactElement => (
   <svg width="19" height="19" viewBox="0 0 24 24" fill="none" role="img" aria-label="Edit">
     <path
       d="M4 20h4L18.5 9.5a2.1 2.1 0 00-3-3L5 17v3z"
-      stroke="#fff"
+      stroke={stroke}
       strokeWidth="2"
       strokeLinejoin="round"
     />
+  </svg>
+);
+
+export const SearchIcon = ({ stroke = "currentColor" }: { stroke?: string } = {}): ReactElement => (
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" role="img" aria-label="Search">
+    <circle cx="11" cy="11" r="6.5" stroke={stroke} strokeWidth="2" />
+    <path d="M16 16l4 4" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+export const TrashIcon = ({ stroke = "currentColor" }: { stroke?: string } = {}): ReactElement => (
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" role="img" aria-label="Remove">
+    <path
+      d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13"
+      stroke={stroke}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path d="M10 11v5M14 11v5" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
 
@@ -101,7 +117,7 @@ export const CheckIcon = ({
   stroke?: string;
   width?: number;
 }): ReactElement => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" role="img" aria-label="Verified">
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" role="img" aria-label="Done">
     <path
       d="M5 13l4 4 10-10"
       stroke={stroke}
@@ -149,7 +165,7 @@ export const PersonIcon = (): ReactElement => (
     fill="none"
     style={{ opacity: 0.9 }}
     role="img"
-    aria-label="Identity"
+    aria-label="Profile"
   >
     <circle cx="12" cy="8" r="3.4" stroke="#fff" strokeWidth="1.6" />
     <path

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Keychain">
+  <defs>
+    <linearGradient id="background" x1="96" y1="72" x2="426" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff8a5b" />
+      <stop offset="1" stop-color="#d83a1d" />
+    </linearGradient>
+    <filter id="shadow" x="78" y="82" width="356" height="362" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#8d210e" flood-opacity="0.32" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="#f4efe8" />
+  <circle cx="256" cy="256" r="184" fill="url(#background)" />
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-width="42" filter="url(#shadow)">
+    <path d="M221 302l-25 25c-31 31-82 31-113 0s-31-82 0-113l55-55c31-31 82-31 113 0 13 13 21 30 23 47" />
+    <path d="M291 210l25-25c31-31 82-31 113 0s31 82 0 113l-55 55c-31 31-82 31-113 0-13-13-21-30-23-47" />
+    <path d="M205 307l102-102" />
+  </g>
+</svg>

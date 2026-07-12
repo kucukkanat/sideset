@@ -26,16 +26,16 @@ export const CreateSheet = ({
       return;
     }
     setStep("gen");
-    genTimer.current = setTimeout(() => setStep("done"), 2100);
+    genTimer.current = setTimeout(() => setStep("done"), 600);
   };
 
   return (
-    <div style={{ animation: "riseIn .4s ease" }}>
+    <div data-testid="create-card-sheet" style={{ animation: "riseIn .4s ease" }}>
       {step === "form" && (
         <>
           <div style={{ textAlign: "center" }}>
             <div className="sheet-title">Create a card</div>
-            <div className="sheet-lead">A separate identity for a part of your life.</div>
+            <div className="sheet-lead">A separate profile for a part of your life.</div>
           </div>
           <div style={{ display: "flex", justifyContent: "center", marginTop: 22 }}>
             <div
@@ -67,6 +67,7 @@ export const CreateSheet = ({
             {EMOJI_CHOICES.map((emoji) => (
               <div
                 key={emoji}
+                data-testid={`create-card-avatar-${emoji}`}
                 role="button"
                 onClick={() => setAvatar(emoji)}
                 style={{
@@ -91,6 +92,7 @@ export const CreateSheet = ({
             {PALETTES.map((p, i) => (
               <div
                 key={p.grad}
+                data-testid={`create-card-color-${i}`}
                 role="button"
                 onClick={() => setColor(i)}
                 style={{
@@ -114,7 +116,9 @@ export const CreateSheet = ({
               Name this card
             </div>
             <input
+              data-testid="create-card-name"
               className="input"
+              maxLength={50}
               value={name}
               onInput={(e) => setName(e.currentTarget.value)}
               placeholder="e.g. Everyday, Work, Gaming"
@@ -122,6 +126,7 @@ export const CreateSheet = ({
           </div>
           <div
             role="button"
+            data-testid="create-card-submit"
             className="btn-dark press"
             onClick={start}
             style={{ marginTop: 22, opacity: canCreate ? 1 : 0.4, ["--press" as string]: 0.97 }}
@@ -132,6 +137,7 @@ export const CreateSheet = ({
       )}
       {step === "gen" && (
         <div
+          data-testid="create-card-progress"
           style={{
             display: "flex",
             flexDirection: "column",
@@ -174,21 +180,22 @@ export const CreateSheet = ({
           </div>
           <div style={{ fontSize: 19, fontWeight: 800, marginTop: 24 }}>Setting things up…</div>
           <div className="sheet-lead" style={{ maxWidth: 250 }}>
-            Creating your secure card and safely storing your backup.
+            Creating your card and saving it on this device.
           </div>
         </div>
       )}
       {step === "done" && (
-        <div className="done-pop">
+        <div data-testid="create-card-complete" className="done-pop">
           <div className="check-bubble">
             <CheckIcon size={44} width={3} />
           </div>
           <div style={{ fontSize: 22, fontWeight: 800, marginTop: 20 }}>You're all set!</div>
           <div className="sheet-lead" style={{ maxWidth: 260 }}>
-            {name} is ready to use. We've kept a safe backup for you.
+            {name} is ready to use. You can export a backup from Settings.
           </div>
           <div
             role="button"
+            data-testid="create-card-done"
             className="btn-dark press"
             onClick={() => onFinish({ name, avatar, color })}
             style={{ marginTop: 24, ["--press" as string]: 0.97 }}

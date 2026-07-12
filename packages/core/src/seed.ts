@@ -80,7 +80,7 @@ export const SEED_CONTACTS: readonly Contact[] = [
     avatar: "🐙",
     color: 3,
     mutuals: 12,
-    bio: "Building open protocols. Tea over coffee, always shipping.",
+    bio: "Building thoughtful tools. Tea over coffee, always shipping.",
     proofs: [
       { provider: "github", username: "milochen" },
       { provider: "twitter", username: "@milo" },
@@ -109,7 +109,7 @@ export const SEED_CONTACTS: readonly Contact[] = [
     avatar: "🔥",
     color: 5,
     mutuals: 3,
-    bio: "Runs a tiny node. Bitcoin, bonfires, and black coffee.",
+    bio: "Makes tiny internet projects. Bonfires and black coffee.",
     proofs: [
       { provider: "twitter", username: "@rune" },
       { provider: "reddit", username: "u/runenode" },

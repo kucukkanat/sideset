@@ -1,33 +1,64 @@
-import { type Card, passStrength, STRENGTH_COLORS, STRENGTH_LABELS } from "@keychain/core";
-import { type ReactElement, useState } from "react";
+import { passStrength, STRENGTH_COLORS, STRENGTH_LABELS } from "@keychain/core";
+import { type ReactElement, useEffect, useState } from "react";
 import { CheckIcon, ShieldIcon } from "../icons.tsx";
 
+export type BackupSaveResult =
+  | { readonly ok: true; readonly contents: string; readonly filename: string }
+  | { readonly ok: false; readonly message: string };
+
+interface BackupDownload {
+  readonly href: string;
+  readonly filename: string;
+}
+
 export const BackupSheet = ({
-  card,
+  label,
+  onSave,
   onToast,
   onDone,
 }: {
-  card: Card;
+  label: string;
+  onSave: (password: string) => Promise<BackupSaveResult>;
   onToast: (msg: string) => void;
   onDone: () => void;
 }): ReactElement => {
-  const [step, setStep] = useState<"intro" | "done">("intro");
-  const [pass, setPass] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const strength = passStrength(pass);
+  const [step, setStep] = useState<"intro" | "saving" | "done">("intro");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [download, setDownload] = useState<BackupDownload | null>(null);
+  const strength = passStrength(password);
   const strengthColor = STRENGTH_COLORS[Math.min(strength - 1, 2)] ?? "#B6A78E";
 
-  const save = (): void => {
-    if (strength < 1) {
-      onToast("Make it a bit stronger");
+  useEffect(
+    () => () => {
+      if (download !== null) URL.revokeObjectURL(download.href);
+    },
+    [download],
+  );
+
+  const save = async (): Promise<void> => {
+    if (strength < 2) {
+      onToast("Use a stronger password");
       return;
     }
+    setStep("saving");
+    const result = await onSave(password);
+    if (!result.ok) {
+      setStep("intro");
+      onToast(result.message);
+      return;
+    }
+    setDownload({
+      href: URL.createObjectURL(new Blob([result.contents], { type: "application/json" })),
+      filename: result.filename,
+    });
+    setPassword("");
     setStep("done");
   };
 
   return (
-    <div style={{ animation: "riseIn .4s ease" }}>
-      {step === "intro" && (
+    <div data-testid="backup-sheet" style={{ animation: "riseIn .4s ease" }}>
+      {(step === "intro" || step === "saving") && (
         <div
           style={{
             display: "flex",
@@ -51,51 +82,62 @@ export const BackupSheet = ({
             <ShieldIcon size={40} width={1.8} />
           </div>
           <div className="sheet-title" style={{ marginTop: 18 }}>
-            Save your backup
+            Save a local backup
           </div>
-          <div className="sheet-lead" style={{ marginTop: 8, maxWidth: 290, lineHeight: 1.5 }}>
-            If you ever lose your phone, this is the only way to get{" "}
-            <b style={{ color: "#3A322A" }}>{card.name}</b> back. Pick a password only you know.
+          <div className="sheet-lead" style={{ marginTop: 8, maxWidth: 300, lineHeight: 1.5 }}>
+            Download an encrypted copy of {label}. You’ll need its password to restore it later.
           </div>
           <div style={{ width: "100%", marginTop: 22, textAlign: "left" }}>
-            <div className="sec-label" style={{ letterSpacing: 0.6, marginBottom: 8 }}>
-              Create a backup password
-            </div>
+            <label className="sec-label" htmlFor="backup-password" style={{ display: "block" }}>
+              Backup password
+            </label>
             <div style={{ position: "relative" }}>
               <input
+                data-testid="backup-password"
+                id="backup-password"
                 className="input"
-                type={showPass ? "text" : "password"}
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                maxLength={256}
                 placeholder="At least 8 characters"
                 style={{ padding: "16px 52px 16px 16px" }}
-                value={pass}
-                onInput={(e) => setPass(e.currentTarget.value)}
+                value={password}
+                disabled={step === "saving"}
+                onInput={(event) => setPassword(event.currentTarget.value)}
               />
-              <div
-                role="button"
-                onClick={() => setShowPass((v) => !v)}
+              <button
+                type="button"
+                data-testid="backup-password-toggle"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((visible) => !visible)}
+                disabled={step === "saving"}
                 style={{
                   position: "absolute",
-                  right: 14,
+                  right: 8,
                   top: "50%",
                   transform: "translateY(-50%)",
+                  width: 42,
+                  height: 42,
+                  border: 0,
+                  background: "transparent",
                   fontSize: 19,
                   cursor: "pointer",
                   opacity: 0.55,
                 }}
               >
-                {showPass ? "🙈" : "👁️"}
-              </div>
+                {showPassword ? "🙈" : "👁️"}
+              </button>
             </div>
             <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-              {[0, 1, 2].map((i) => (
+              {[0, 1, 2].map((index) => (
                 <div
-                  key={i}
+                  key={index}
                   style={{
                     flex: 1,
                     height: 5,
                     borderRadius: 3,
                     transition: "background .25s",
-                    background: i < strength ? strengthColor : "#E4DBCC",
+                    background: index < strength ? strengthColor : "#E4DBCC",
                   }}
                 />
               ))}
@@ -108,7 +150,9 @@ export const BackupSheet = ({
                 marginTop: 7,
               }}
             >
-              {pass ? STRENGTH_LABELS[strength] : "Use letters, numbers & a symbol"}
+              {password
+                ? STRENGTH_LABELS[strength]
+                : "Use mixed-case letters and a number or symbol"}
             </div>
           </div>
           <div
@@ -116,7 +160,7 @@ export const BackupSheet = ({
               display: "flex",
               alignItems: "center",
               gap: 10,
-              background: "#FFF8EC",
+              background: "var(--kc-warning-bg)",
               borderRadius: 14,
               padding: "13px 15px",
               marginTop: 18,
@@ -128,46 +172,62 @@ export const BackupSheet = ({
               style={{
                 fontSize: 12.5,
                 fontWeight: 600,
-                color: "#8A6D3B",
+                color: "var(--kc-warning-text)",
                 textAlign: "left",
                 lineHeight: 1.4,
               }}
             >
-              We can't reset this for you. Keep it somewhere safe.
+              This password never leaves your device and can’t be reset.
             </div>
           </div>
-          <div
-            role="button"
+          <button
+            type="button"
+            data-testid="backup-create"
             className="btn-dark press"
-            onClick={save}
+            onClick={() => void save()}
+            disabled={step === "saving" || strength < 2}
             style={{
               marginTop: 20,
+              border: 0,
               background: "#2E6BE6",
-              opacity: strength >= 1 ? 1 : 0.45,
+              opacity: step === "saving" || strength < 2 ? 0.45 : 1,
               ["--press" as string]: 0.97,
             }}
           >
-            Save to iCloud
-          </div>
+            {step === "saving" ? "Encrypting…" : "Create backup file"}
+          </button>
         </div>
       )}
       {step === "done" && (
-        <div className="done-pop">
+        <div data-testid="backup-complete" className="done-pop">
           <div className="check-bubble">
             <CheckIcon size={44} width={3} />
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, marginTop: 20 }}>Backup saved</div>
-          <div className="sheet-lead" style={{ maxWidth: 260 }}>
-            {card.name} is safely backed up to your iCloud. You're protected.
+          <div style={{ fontSize: 22, fontWeight: 800, marginTop: 20 }}>Backup prepared</div>
+          <div className="sheet-lead" style={{ maxWidth: 275 }}>
+            Your encrypted file is ready. Download it, then keep the file and its password somewhere
+            safe.
           </div>
-          <div
-            role="button"
-            className="btn-dark press"
+          {download !== null && (
+            <a
+              data-testid="backup-download"
+              className="btn-dark press"
+              href={download.href}
+              download={download.filename}
+              style={{ marginTop: 24, textDecoration: "none", ["--press" as string]: 0.97 }}
+            >
+              Download backup file
+            </a>
+          )}
+          <button
+            type="button"
+            data-testid="backup-done"
+            className="press"
             onClick={onDone}
-            style={{ marginTop: 24, ["--press" as string]: 0.97 }}
+            style={{ marginTop: 12, border: 0, background: "transparent", fontWeight: 800 }}
           >
             Done
-          </div>
+          </button>
         </div>
       )}
     </div>

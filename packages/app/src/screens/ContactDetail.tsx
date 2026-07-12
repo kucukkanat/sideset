@@ -1,186 +1,289 @@
-import { type Contact, PROVIDER_META, paletteFor } from "@keychain/core";
-import type { ReactElement, RefObject } from "react";
-import { BackIcon, CheckIcon, CopyIcon, MessageIcon, ProviderIcon, ShareIcon } from "../icons.tsx";
+import { type Contact, PROVIDER_META, paletteFor, proofVerificationUrl } from "@keychain/core";
+import { type ReactElement, type RefObject, useEffect, useRef, useState } from "react";
+import { BackIcon, CopyIcon, EditIcon, ProviderIcon, ShareIcon, TrashIcon } from "../icons.tsx";
 
 interface ContactDetailProps {
   contact: Contact;
+  profileLink: string;
   heroRef: RefObject<HTMLDivElement | null>;
   heroHidden: boolean;
   onBack: () => void;
-  onToast: (msg: string) => void;
+  onEdit: () => void;
+  onRemove: () => void;
+  onCopyProfileLink: () => void;
+  onCopyPublicKey: () => void;
+  onShare: () => void;
+  onRemovalDialogChange: (open: boolean) => void;
 }
 
 export const ContactDetail = ({
   contact,
+  profileLink,
   heroRef,
   heroHidden,
   onBack,
-  onToast,
+  onEdit,
+  onRemove,
+  onCopyProfileLink,
+  onCopyPublicKey,
+  onShare,
+  onRemovalDialogChange,
 }: ContactDetailProps): ReactElement => {
-  const pal = paletteFor(contact.color);
-  const share = (): void => onToast(`${contact.name} shared`);
+  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
+  const removeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const cancelRemovalButtonRef = useRef<HTMLButtonElement | null>(null);
+  const palette = paletteFor(contact.color);
+
+  useEffect(() => {
+    if (!confirmingRemoval) return;
+    requestAnimationFrame(() => cancelRemovalButtonRef.current?.focus());
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setConfirmingRemoval(false);
+      requestAnimationFrame(() => removeButtonRef.current?.focus());
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmingRemoval]);
+
+  useEffect(() => {
+    onRemovalDialogChange(confirmingRemoval);
+  }, [confirmingRemoval, onRemovalDialogChange]);
+
+  useEffect(() => () => onRemovalDialogChange(false), [onRemovalDialogChange]);
+
+  const cancelRemoval = (): void => {
+    setConfirmingRemoval(false);
+    requestAnimationFrame(() => removeButtonRef.current?.focus());
+  };
+
   return (
     <div
-      className="scr screen"
-      style={{ padding: "0 0 118px", animationDuration: ".3s", background: "#F4EFE8" }}
+      data-testid={`screen-contact-detail-${contact.id}`}
+      className="scr screen contact-detail-screen"
+      style={{ padding: "0 0 118px", animationDuration: ".3s" }}
     >
       <div
         ref={heroRef}
         className="detail-hero"
-        style={{ background: pal.grad, opacity: heroHidden ? 0 : 1 }}
+        aria-hidden={confirmingRemoval || undefined}
+        inert={confirmingRemoval || undefined}
+        style={{
+          background: palette.grad,
+          opacity: heroHidden ? 0 : 1,
+          pointerEvents: heroHidden ? "none" : "auto",
+        }}
       >
         <div className="hero-sheen" />
-        <div
-          style={{
-            position: "relative",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            zIndex: 2,
-          }}
-        >
-          <div
-            role="button"
+        <div className="contact-detail-hero-actions">
+          <button
+            data-testid="contact-detail-back"
+            type="button"
+            aria-label="Back to people"
             className="hero-btn press"
-            style={{ ["--press" as string]: 0.9 }}
+            style={{ border: 0, color: "inherit" }}
             onClick={onBack}
           >
             <BackIcon />
-          </div>
-          <div
-            role="button"
+          </button>
+          <button
+            data-testid="contact-detail-edit"
+            type="button"
+            aria-label={`Edit ${contact.name}`}
             className="hero-btn press"
-            style={{ ["--press" as string]: 0.9 }}
-            onClick={share}
+            style={{ border: 0, color: "inherit" }}
+            onClick={onEdit}
           >
-            <ShareIcon stroke="#fff" />
-          </div>
+            <EditIcon />
+          </button>
         </div>
         <div className="hero-id">
           <div className="hero-avatar">{contact.avatar}</div>
           <div className="hero-name">{contact.name}</div>
           <div className="hero-tag">{contact.handle}</div>
-          <div className="hero-bio">{contact.bio || "No bio yet."}</div>
-        </div>
-      </div>
-
-      <div style={{ padding: "18px 24px 4px" }}>
-        <div
-          role="button"
-          className="btn-dark press"
-          onClick={() => onToast(`Opening chat with ${contact.name}`)}
-          style={{
-            padding: 15,
-            fontSize: 14.5,
-            boxShadow: "0 8px 20px -8px rgba(0,0,0,.4)",
-            ["--press" as string]: 0.97,
-          }}
-        >
-          <MessageIcon />
-          Message {contact.handle}
+          <div className="hero-bio">{contact.bio || "No notes or bio yet."}</div>
         </div>
       </div>
 
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 10,
-          padding: "12px 24px 4px",
-        }}
+        className="contact-detail-content"
+        aria-hidden={confirmingRemoval || undefined}
+        inert={confirmingRemoval || undefined}
       >
-        <div
-          role="button"
-          className="action-tile press"
-          onClick={() => onToast(`Send a tip to ${contact.name}`)}
-        >
-          <div className="ico" style={{ background: "#FFF6DB" }}>
-            ⚡
+        <div className="contact-detail-stats" role="group" aria-label="Contact summary">
+          <div>
+            <strong>{contact.mutuals}</strong>
+            <span>mutual contacts</span>
           </div>
-          <div className="lbl">Send tip</div>
-        </div>
-        <div role="button" className="action-tile press" onClick={share}>
-          <div className="ico" style={{ background: "#FFEDE7" }}>
-            <ShareIcon />
+          <div>
+            <strong>{contact.proofs.length}</strong>
+            <span>connected accounts</span>
           </div>
-          <div className="lbl">Share</div>
         </div>
-      </div>
 
-      <div style={{ padding: "20px 24px 0" }}>
-        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Public key</div>
-        <div
-          role="button"
-          className="press"
-          onClick={() => onToast("Public key copied")}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 13,
-            background: "#FFF",
-            borderRadius: 18,
-            padding: "15px 16px",
-            boxShadow: "0 4px 14px -8px rgba(80,50,20,.2)",
-            ["--press" as string]: 0.98,
-          }}
-        >
-          <div className="row-icon" style={{ background: "#EFEAF7" }}>
-            🔑
-          </div>
-          <div className="row-body">
-            <div
-              style={{
-                fontSize: 13.5,
-                fontWeight: 700,
-                fontFamily: "ui-monospace,Menlo,monospace",
-                color: "#241F1B",
-              }}
-            >
-              {contact.npub}
-            </div>
-            <div style={{ fontSize: 11.5, fontWeight: 600, color: "#A08E78", marginTop: 2 }}>
-              Tap to copy
+        <div className="contact-detail-actions">
+          <button
+            data-testid="contact-detail-share-action"
+            type="button"
+            className="action-tile press"
+            onClick={onShare}
+          >
+            <span className="ico" style={{ background: "#FFEDE7" }} aria-hidden="true">
+              <ShareIcon />
+            </span>
+            <span className="lbl">Share contact</span>
+          </button>
+          <button
+            ref={removeButtonRef}
+            data-testid="contact-detail-remove"
+            type="button"
+            className="action-tile contact-detail-remove-action press"
+            onClick={() => setConfirmingRemoval(true)}
+          >
+            <span className="ico" aria-hidden="true">
+              <TrashIcon />
+            </span>
+            <span className="lbl">Remove contact</span>
+          </button>
+        </div>
+
+        <section className="contact-detail-section" aria-labelledby="contact-profile-link-title">
+          <div className="contact-detail-section-heading">
+            <div>
+              <h2 id="contact-profile-link-title">Profile link</h2>
+              <p>Share the full contact profile.</p>
             </div>
           </div>
-          <CopyIcon />
-        </div>
-      </div>
+          <button
+            data-testid="contact-detail-copy-link"
+            type="button"
+            aria-label={`Copy ${contact.name}'s profile link`}
+            className="contact-copy-row press"
+            onClick={onCopyProfileLink}
+          >
+            <span className="contact-copy-icon" aria-hidden="true">
+              🔗
+            </span>
+            <span className="contact-copy-body">
+              <strong>{profileLink}</strong>
+              <small>Tap to copy</small>
+            </span>
+            <CopyIcon />
+          </button>
+        </section>
 
-      <div style={{ padding: "20px 24px 0" }}>
-        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Verified identities</div>
-        <div className="panel">
-          {contact.proofs.map((proof) => {
-            const meta = PROVIDER_META[proof.provider];
-            return (
-              <div key={proof.provider} className="row" style={{ padding: "13px 16px" }}>
-                <div className="row-icon" style={{ background: meta.bg }}>
-                  <ProviderIcon provider={proof.provider} />
-                </div>
-                <div className="row-body">
-                  <div className="row-title ellip">{proof.username}</div>
-                  <div className="row-sub" style={{ fontSize: 11.5, marginTop: 1 }}>
-                    Verified on {meta.name}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: "50%",
-                    background: "#E9F7EC",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flex: "0 0 auto",
-                  }}
-                >
-                  <CheckIcon />
-                </div>
+        {contact.npub.length > 0 && (
+          <section className="contact-detail-section" aria-labelledby="contact-public-key-title">
+            <div className="contact-detail-section-heading">
+              <div>
+                <h2 id="contact-public-key-title">Public key</h2>
+                <p>The permanent identity for this contact.</p>
               </div>
-            );
-          })}
-        </div>
+            </div>
+            <button
+              data-testid="contact-detail-copy-public-key"
+              type="button"
+              aria-label={`Copy ${contact.name}'s public key`}
+              className="contact-copy-row press"
+              onClick={onCopyPublicKey}
+            >
+              <span className="contact-copy-icon" aria-hidden="true">
+                🔑
+              </span>
+              <span className="contact-copy-body">
+                <code>{contact.npub}</code>
+                <small>Tap to copy</small>
+              </span>
+              <CopyIcon />
+            </button>
+          </section>
+        )}
+
+        {contact.proofs.length > 0 && (
+          <section
+            data-testid="contact-detail-accounts"
+            className="contact-detail-section"
+            aria-labelledby="contact-accounts-title"
+          >
+            <div className="contact-detail-section-heading">
+              <div>
+                <h2 id="contact-accounts-title">Connected accounts</h2>
+                <p>Open a platform to check each account yourself.</p>
+              </div>
+            </div>
+            <div className="panel">
+              {contact.proofs.map((proof) => {
+                const meta = PROVIDER_META[proof.provider];
+                return (
+                  <div
+                    data-testid={`contact-account-${proof.provider}`}
+                    key={proof.provider}
+                    className="row"
+                    style={{ padding: "13px 16px" }}
+                  >
+                    <div className="row-icon" style={{ background: meta.bg }}>
+                      <ProviderIcon provider={proof.provider} />
+                    </div>
+                    <div className="row-body">
+                      <div className="row-title ellip">{proof.username}</div>
+                      <div className="row-sub">Connected via {meta.name}</div>
+                    </div>
+                    <a
+                      data-testid={`contact-account-${proof.provider}-verify`}
+                      className="contact-proof-verify press"
+                      href={proofVerificationUrl(proof)}
+                      target={proof.provider === "email" ? undefined : "_blank"}
+                      rel={proof.provider === "email" ? undefined : "noopener noreferrer"}
+                      aria-label={`Verify ${proof.username} on ${meta.name}`}
+                    >
+                      Verify <span aria-hidden="true">↗</span>
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
+
+      {confirmingRemoval && (
+        <div className="contact-dialog-layer">
+          <div
+            data-testid="remove-contact-dialog"
+            className="contact-confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="remove-contact-title"
+            aria-describedby="remove-contact-description"
+          >
+            <div className="contact-confirm-icon">🗑️</div>
+            <h2 id="remove-contact-title">Remove {contact.name}?</h2>
+            <p id="remove-contact-description">
+              This removes the contact from this device. This can’t be undone.
+            </p>
+            <div className="contact-confirm-actions">
+              <button
+                ref={cancelRemovalButtonRef}
+                data-testid="remove-contact-cancel"
+                type="button"
+                className="btn-light press"
+                onClick={cancelRemoval}
+              >
+                Cancel
+              </button>
+              <button
+                data-testid="remove-contact-confirm"
+                type="button"
+                className="contact-confirm-remove press"
+                onClick={onRemove}
+              >
+                Remove contact
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

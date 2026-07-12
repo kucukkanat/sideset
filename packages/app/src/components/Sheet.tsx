@@ -1,4 +1,4 @@
-import { type ReactElement, type ReactNode, useState } from "react";
+import { type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
 
 /**
  * Bottom sheet with two ways to drag-close: the grab handle always drags, and
@@ -7,12 +7,58 @@ import { type ReactElement, type ReactNode, useState } from "react";
 export const Sheet = ({
   onClose,
   children,
+  label = "Dialog",
+  dismissible = true,
 }: {
   onClose: () => void;
   children: ReactNode;
+  label?: string;
+  dismissible?: boolean;
 }): ReactElement => {
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusableSelector =
+      "[autofocus],input:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]";
+    const focusFrame = requestAnimationFrame(() => {
+      const sheet = sheetRef.current;
+      const preferred =
+        sheet?.querySelector<HTMLElement>("[autofocus]") ??
+        sheet?.querySelector<HTMLElement>("input:not([disabled]),textarea:not([disabled])") ??
+        sheet?.querySelector<HTMLElement>("button:not([disabled]),a[href]");
+      preferred?.focus();
+    });
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || sheetRef.current === null) return;
+      const focusable = Array.from(
+        sheetRef.current.querySelectorAll<HTMLElement>(focusableSelector),
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (first === undefined || last === undefined) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      window.removeEventListener("keydown", onKeyDown);
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [onClose]);
 
   const trackDrag = (
     startY: number,
@@ -50,11 +96,13 @@ export const Sheet = ({
   };
 
   const onHandleDown = (e: React.PointerEvent): void => {
+    if (!dismissible) return;
     e.preventDefault();
     trackDrag(e.clientY, () => true, 120);
   };
 
   const onBodyDown = (e: React.PointerEvent): void => {
+    if (!dismissible) return;
     const tag = e.target instanceof HTMLElement ? e.target.tagName : "";
     if (tag === "INPUT" || tag === "TEXTAREA") return;
     const scroller = e.currentTarget;
@@ -68,7 +116,8 @@ export const Sheet = ({
   return (
     <>
       <div
-        onClick={onClose}
+        data-testid="sheet-backdrop"
+        onClick={dismissible ? onClose : undefined}
         style={{
           position: "absolute",
           inset: 0,
@@ -79,7 +128,12 @@ export const Sheet = ({
         }}
       />
       <div
+        ref={sheetRef}
+        data-testid="sheet"
         className="sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
         style={{
           transform: `translateY(${dragY}px)`,
           transition: dragging ? "none" : "transform .34s cubic-bezier(.2,.9,.3,1)",
@@ -87,6 +141,7 @@ export const Sheet = ({
         }}
       >
         <div
+          data-testid="sheet-handle"
           onPointerDown={onHandleDown}
           style={{
             position: "relative",
@@ -100,6 +155,7 @@ export const Sheet = ({
           <div style={{ width: 38, height: 5, borderRadius: 3, background: "#DAD0C1" }} />
           <button
             type="button"
+            data-testid="sheet-close"
             aria-label="Close"
             onPointerDown={(e) => {
               e.preventDefault();
@@ -110,12 +166,12 @@ export const Sheet = ({
               position: "absolute",
               top: 8,
               right: 16,
-              width: 30,
-              height: 30,
+              width: 40,
+              height: 40,
               border: "none",
               borderRadius: "50%",
-              background: "#ECE4D8",
-              color: "#8A7A64",
+              background: "var(--kc-surface-raised)",
+              color: "var(--kc-muted)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -139,12 +195,13 @@ export const Sheet = ({
           </button>
         </div>
         <div
+          data-testid="sheet-content"
           className="scr"
           onPointerDown={onBodyDown}
           style={{
             overflowY: "auto",
             maxHeight: "78vh",
-            padding: "8px 24px 34px",
+            padding: "8px 24px calc(34px + env(safe-area-inset-bottom))",
             touchAction: "pan-y",
           }}
         >

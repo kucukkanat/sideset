@@ -1,31 +1,50 @@
-import { type Card, friendlyId, paletteFor, QR_SIZE, qrPattern } from "@keychain/core";
-import { type ReactElement, useMemo, useRef, useState } from "react";
+import { type Card, paletteFor } from "@keychain/core";
+import { type ReactElement, useEffect, useRef, useState } from "react";
+import { QrCode } from "../components/QrCode.tsx";
+import { copyText, shareProfile } from "../sharing.ts";
 
 export const ShareSheet = ({
   card,
+  shareUrl,
   onToast,
-  onClose,
 }: {
   card: Card;
+  shareUrl: string;
   onToast: (msg: string) => void;
-  onClose: () => void;
 }): ReactElement => {
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pal = paletteFor(card.color);
-  const id = friendlyId(card.name);
-  // 441 cells — compute once per card, not per render.
-  const cells = useMemo(() => qrPattern(id), [id]);
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
 
-  const copy = (): void => {
+  const copy = async (): Promise<void> => {
+    const result = await copyText(shareUrl);
+    if (!result.ok) {
+      onToast("Clipboard access isn't available");
+      return;
+    }
     setCopied(true);
-    onToast("Link copied");
+    onToast("Profile link copied");
     clearTimeout(copyTimer.current);
     copyTimer.current = setTimeout(() => setCopied(false), 1600);
   };
 
+  const share = async (): Promise<void> => {
+    const result = await shareProfile({
+      title: `${card.name} profile`,
+      text: `Add my ${card.name} profile`,
+      url: shareUrl,
+    });
+    if (!result.ok) {
+      if (result.reason !== "cancelled") onToast("Sharing isn't available right now");
+      return;
+    }
+    onToast(result.method === "clipboard" ? "Profile link copied" : "Profile shared");
+  };
+
   return (
     <div
+      data-testid="share-sheet"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -35,13 +54,13 @@ export const ShareSheet = ({
       }}
     >
       <div className="sheet-title">Share {card.name}</div>
-      <div className="sheet-lead" style={{ maxWidth: 270 }}>
-        Let a friend or app add you. They just scan this — no copying codes.
+      <div className="sheet-lead" style={{ maxWidth: 280 }}>
+        A friend can scan this code or open your link to add the profile.
       </div>
       <div
         style={{
           marginTop: 22,
-          padding: 18,
+          padding: 12,
           background: "#fff",
           borderRadius: 26,
           boxShadow: "0 12px 30px -14px rgba(80,50,20,.4)",
@@ -49,6 +68,7 @@ export const ShareSheet = ({
         }}
       >
         <div
+          aria-hidden="true"
           style={{
             position: "absolute",
             inset: 0,
@@ -61,67 +81,44 @@ export const ShareSheet = ({
             opacity: 0.5,
           }}
         />
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${QR_SIZE},1fr)`,
-            width: 210,
-            height: 210,
-          }}
-        >
-          {cells.map((on, i) => (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: cells are a fixed positional grid.
-              key={i}
-              style={{ background: on ? "#1B1917" : "transparent", borderRadius: 1 }}
-            />
-          ))}
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%,-50%)",
-            width: 52,
-            height: 52,
-            borderRadius: 15,
-            background: pal.grad,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 26,
-            boxShadow: "0 0 0 5px #fff",
-          }}
-        >
-          {card.avatar}
+        <div data-testid="share-qr-container" style={{ overflow: "hidden", borderRadius: 18 }}>
+          <QrCode value={shareUrl} />
         </div>
       </div>
-      <div style={{ marginTop: 18, fontSize: 14, fontWeight: 700, color: "#3A322A" }}>{id}</div>
+      <div
+        data-theme-text="primary"
+        style={{ marginTop: 16, fontSize: 14, fontWeight: 800, color: "var(--kc-text)" }}
+      >
+        @{card.handle}
+      </div>
       <div style={{ display: "flex", gap: 10, marginTop: 18, width: "100%" }}>
-        <div
-          role="button"
+        <button
+          type="button"
+          data-testid="share-copy-link"
           className="press"
-          onClick={copy}
+          onClick={() => void copy()}
           style={{
             flex: 1,
-            background: "#F0E9DE",
+            border: 0,
+            background: "var(--kc-surface-raised)",
             borderRadius: 16,
             padding: 15,
             fontSize: 14,
             fontWeight: 800,
-            color: "#3A322A",
+            color: "var(--kc-text)",
             ["--press" as string]: 0.96,
           }}
         >
           {copied ? "Copied ✓" : "Copy link"}
-        </div>
-        <div
-          role="button"
+        </button>
+        <button
+          type="button"
+          data-testid="share-native"
           className="press"
-          onClick={onClose}
+          onClick={() => void share()}
           style={{
             flex: 1,
+            border: 0,
             background: "#1B1917",
             color: "#fff",
             borderRadius: 16,
@@ -131,8 +128,8 @@ export const ShareSheet = ({
             ["--press" as string]: 0.96,
           }}
         >
-          Share link
-        </div>
+          Share
+        </button>
       </div>
     </div>
   );

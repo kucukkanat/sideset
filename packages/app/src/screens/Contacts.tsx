@@ -1,214 +1,377 @@
-import { type Contact, paletteFor } from "@keychain/core";
-import { type MutableRefObject, type ReactElement, useEffect, useRef } from "react";
-import { PlusIcon } from "../icons.tsx";
+import { type Contact, paletteFor, searchContacts } from "@keychain/core";
+import {
+  type MutableRefObject,
+  type ReactElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { ChevronIcon, PlusIcon, SearchIcon, TrashIcon } from "../icons.tsx";
 
 interface ContactsProps {
   contacts: readonly Contact[];
-  cardEls: MutableRefObject<Record<string, HTMLDivElement>>;
+  cardEls: MutableRefObject<Record<string, HTMLButtonElement>>;
   savedScroll: MutableRefObject<number>;
+  query: string;
+  onQueryChange: (query: string) => void;
+  onManagingChange: (managing: boolean) => void;
   onOpen: (id: string, el: HTMLElement | null) => void;
-  onAdd: () => void;
+  onImport: () => void;
+  onRemove: (contactIds: readonly string[]) => void;
 }
 
-/**
- * Vertical card wall: cards scale and fade with distance from the viewport
- * centre. Transforms are applied imperatively (rAF-throttled) — driving them
- * through state would re-render the whole list on every scroll frame.
- */
+const resultLabel = (count: number, total: number, filtering: boolean): string =>
+  filtering ? `${count} of ${total} people` : `${total} ${total === 1 ? "person" : "people"}`;
+
 export const Contacts = ({
   contacts,
   cardEls,
   savedScroll,
+  query,
+  onQueryChange,
+  onManagingChange,
   onOpen,
-  onAdd,
+  onImport,
+  onRemove,
 }: ContactsProps): ReactElement => {
+  const [managing, setManaging] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const raf = useRef<number | null>(null);
+  const manageButtonRef = useRef<HTMLButtonElement | null>(null);
+  const bulkRemoveButtonRef = useRef<HTMLButtonElement | null>(null);
+  const cancelRemovalButtonRef = useRef<HTMLButtonElement | null>(null);
+  const visibleContacts = useMemo(() => searchContacts(contacts, query), [contacts, query]);
+  const allVisibleSelected =
+    visibleContacts.length > 0 && visibleContacts.every((contact) => selected.has(contact.id));
+  const selectedCount = selected.size;
 
-  const applyTransforms = (): void => {
-    const sc = scrollerRef.current;
-    if (!sc) return;
-    const r = sc.getBoundingClientRect();
-    const centre = r.top + r.height * 0.5;
-    for (const p of contacts) {
-      const el = cardEls.current[p.id];
-      if (!el?.isConnected) continue;
-      const b = el.getBoundingClientRect();
-      const d = Math.min(Math.abs(b.top + b.height / 2 - centre) / (r.height * 0.5), 1);
-      el.style.transform = `scale(${(1 - d * 0.14).toFixed(3)})`;
-      el.style.opacity = (1 - d * 0.5).toFixed(3);
-      el.style.zIndex = String(Math.round(100 - d * 80));
-    }
-  };
+  useEffect(() => {
+    if (scrollerRef.current !== null) scrollerRef.current.scrollTop = savedScroll.current;
+  }, [savedScroll]);
 
-  const onScroll = (): void => {
-    if (raf.current !== null) return;
-    raf.current = requestAnimationFrame(() => {
-      raf.current = null;
-      applyTransforms();
+  useEffect(() => {
+    onManagingChange(managing);
+  }, [managing, onManagingChange]);
+
+  useEffect(() => () => onManagingChange(false), [onManagingChange]);
+
+  useEffect(() => {
+    if (!managing) return;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      if (confirmingRemoval) {
+        setConfirmingRemoval(false);
+        requestAnimationFrame(() => bulkRemoveButtonRef.current?.focus());
+        return;
+      }
+      setSelected(new Set());
+      setManaging(false);
+      requestAnimationFrame(() => manageButtonRef.current?.focus());
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmingRemoval, managing]);
+
+  useEffect(() => {
+    if (confirmingRemoval) requestAnimationFrame(() => cancelRemovalButtonRef.current?.focus());
+  }, [confirmingRemoval]);
+
+  const toggleContact = (contactId: string): void => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(contactId)) next.delete(contactId);
+      else next.add(contactId);
+      return next;
     });
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount — restore scroll, then position cards.
-  useEffect(() => {
-    const sc = scrollerRef.current;
-    if (sc && savedScroll.current) sc.scrollTop = savedScroll.current;
-    applyTransforms();
-    return () => {
-      if (raf.current !== null) cancelAnimationFrame(raf.current);
-    };
-  }, []);
+  const toggleAllVisible = (): void => {
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const contact of visibleContacts) {
+        if (allVisibleSelected) next.delete(contact.id);
+        else next.add(contact.id);
+      }
+      return next;
+    });
+  };
+
+  const finishManaging = (): void => {
+    setManaging(false);
+    setSelected(new Set());
+    setConfirmingRemoval(false);
+  };
+
+  const confirmRemoval = (): void => {
+    const contactIds = [...selected];
+    if (contactIds.length === 0) return;
+    onRemove(contactIds);
+    finishManaging();
+    requestAnimationFrame(() => manageButtonRef.current?.focus());
+  };
 
   return (
     <div
-      className="scr screen"
+      data-testid="screen-contacts"
+      className="scr screen contacts-screen"
       ref={scrollerRef}
-      onScroll={onScroll}
-      style={{ scrollSnapType: "y proximity" }}
+      onScroll={(event) => {
+        savedScroll.current = event.currentTarget.scrollTop;
+      }}
     >
-      <div className="screen-hdr">
-        <div>
-          <div className="hdr-sub">People you follow</div>
-          <div className="hdr-title">Contacts</div>
-        </div>
-        <div
-          role="button"
-          className="round-btn press"
-          style={{ ["--press" as string]: 0.9 }}
-          onClick={onAdd}
-        >
-          <PlusIcon stroke="#1B1917" size={22} width={2.2} />
-        </div>
-      </div>
       <div
-        style={{
-          padding: "14px 30px 34px",
-          display: "flex",
-          flexDirection: "column",
-          perspective: 1200,
-        }}
+        className="contacts-shell"
+        aria-hidden={confirmingRemoval || undefined}
+        inert={confirmingRemoval || undefined}
       >
-        {contacts.map((p, i) => {
-          const pal = paletteFor(p.color);
-          return (
-            <div
-              key={p.id}
-              role="button"
-              ref={(el) => {
-                if (el) cardEls.current[p.id] = el;
-              }}
-              onClick={(e) => {
-                savedScroll.current = scrollerRef.current?.scrollTop ?? 0;
-                onOpen(p.id, e.currentTarget);
-              }}
-              style={{
-                position: "relative",
-                marginTop: i === 0 ? 0 : 14,
-                scrollSnapAlign: "center",
-                transformOrigin: "center center",
-                willChange: "transform,opacity",
-                transition: "transform .25s ease,opacity .25s ease",
-                cursor: "pointer",
+        <header className="contacts-header">
+          <div>
+            <div className="hdr-sub">Your private address book</div>
+            <h1 className="hdr-title">People</h1>
+          </div>
+          <div className="contacts-header-actions">
+            <button
+              ref={manageButtonRef}
+              data-testid="contacts-manage"
+              type="button"
+              className="contact-toolbar-button press"
+              aria-pressed={managing}
+              aria-controls="contacts-list"
+              onClick={() => {
+                if (managing) finishManaging();
+                else setManaging(true);
               }}
             >
-              <div
-                style={{
-                  position: "relative",
-                  height: 160,
-                  borderRadius: 24,
-                  background: pal.grad,
-                  overflow: "hidden",
-                  boxShadow: `0 22px 46px -20px ${pal.shadow},0 2px 6px rgba(0,0,0,.12),0 0 0 1px rgba(255,255,255,.14) inset`,
+              {managing ? "Done" : "Manage"}
+            </button>
+            {!managing && (
+              <button
+                data-testid="contacts-import-profile"
+                type="button"
+                className="contact-add-button press"
+                onClick={onImport}
+              >
+                <span aria-hidden="true">
+                  <PlusIcon size={18} width={2.5} />
+                </span>
+                Add
+              </button>
+            )}
+          </div>
+        </header>
+
+        <div className="contacts-search-wrap">
+          <span aria-hidden="true">
+            <SearchIcon stroke="var(--kc-subtle)" />
+          </span>
+          <input
+            data-testid="contacts-search"
+            className="contacts-search"
+            type="search"
+            aria-label="Search contacts"
+            placeholder="Search names, handles, accounts, or keys"
+            disabled={managing}
+            value={query}
+            onInput={(event) => onQueryChange(event.currentTarget.value)}
+          />
+        </div>
+
+        <div className="contacts-list-meta">
+          <span>
+            {resultLabel(visibleContacts.length, contacts.length, query.trim().length > 0)}
+          </span>
+          {managing && visibleContacts.length > 0 && (
+            <button
+              data-testid="contacts-select-all"
+              type="button"
+              className="contact-text-button press"
+              onClick={toggleAllVisible}
+            >
+              {allVisibleSelected ? "Clear results" : `Select all ${visibleContacts.length}`}
+            </button>
+          )}
+        </div>
+
+        {contacts.length === 0 ? (
+          <div data-testid="contacts-empty" className="contacts-empty">
+            <div className="contacts-empty-icon">👥</div>
+            <h2>No contacts yet</h2>
+            <p>Add a profile link or public key to start your private address book.</p>
+            <button
+              data-testid="contacts-empty-add"
+              type="button"
+              className="btn-dark press"
+              onClick={onImport}
+            >
+              Add your first contact
+            </button>
+          </div>
+        ) : visibleContacts.length === 0 ? (
+          <div data-testid="contacts-no-results" className="contacts-empty">
+            <div className="contacts-empty-icon">🔎</div>
+            <h2>No matching people</h2>
+            <p>Try a name, handle, connected account, or public key.</p>
+            <button
+              data-testid="contacts-clear-search"
+              type="button"
+              className="contact-toolbar-button press"
+              onClick={() => onQueryChange("")}
+            >
+              Clear search
+            </button>
+          </div>
+        ) : (
+          <ul id="contacts-list" data-testid="contacts-list" className="contacts-list">
+            {visibleContacts.map((contact) => {
+              const palette = paletteFor(contact.color);
+              const selectedContact = selected.has(contact.id);
+              const accountLabel =
+                contact.proofs.length === 0
+                  ? contact.npub.length > 0
+                    ? "Saved by public key"
+                    : "No connected accounts"
+                  : `${contact.proofs.length} connected ${contact.proofs.length === 1 ? "account" : "accounts"}`;
+              return (
+                <li key={contact.id}>
+                  {managing ? (
+                    <label
+                      className={`contact-row contact-row-selectable${selectedContact ? " is-selected" : ""}`}
+                    >
+                      <input
+                        data-testid={`contact-select-${contact.id}`}
+                        type="checkbox"
+                        checked={selectedContact}
+                        onChange={() => toggleContact(contact.id)}
+                        aria-label={`Select ${contact.name}`}
+                      />
+                      <span
+                        className="contact-row-avatar"
+                        style={{ background: palette.grad }}
+                        aria-hidden="true"
+                      >
+                        {contact.avatar}
+                      </span>
+                      <span className="contact-row-copy">
+                        <strong>{contact.name}</strong>
+                        <span>{contact.handle}</span>
+                        <small>{accountLabel}</small>
+                      </span>
+                      <span className="contact-selection-mark" aria-hidden="true">
+                        {selectedContact ? "✓" : ""}
+                      </span>
+                    </label>
+                  ) : (
+                    <button
+                      ref={(element) => {
+                        if (element !== null) cardEls.current[contact.id] = element;
+                      }}
+                      data-testid={`contact-card-${contact.id}`}
+                      type="button"
+                      className="contact-row contact-row-open press"
+                      onClick={(event) => onOpen(contact.id, event.currentTarget)}
+                    >
+                      <span
+                        className="contact-row-avatar"
+                        style={{ background: palette.grad }}
+                        aria-hidden="true"
+                      >
+                        {contact.avatar}
+                      </span>
+                      <span className="contact-row-copy">
+                        <strong>{contact.name}</strong>
+                        <span>{contact.handle}</span>
+                        <small>{accountLabel}</small>
+                      </span>
+                      <span className="contact-row-aside">
+                        <small>{contact.mutuals} mutual</small>
+                        <ChevronIcon />
+                      </span>
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      {managing && (
+        <div
+          className="contacts-bulk-bar"
+          aria-hidden={confirmingRemoval || undefined}
+          inert={confirmingRemoval || undefined}
+        >
+          <div
+            data-testid="contacts-selection-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <strong>{selectedCount}</strong>
+            <span>{selectedCount === 1 ? " contact selected" : " contacts selected"}</span>
+          </div>
+          <button
+            ref={bulkRemoveButtonRef}
+            data-testid="contacts-bulk-remove"
+            type="button"
+            className="contact-remove-button press"
+            disabled={selectedCount === 0}
+            onClick={() => setConfirmingRemoval(true)}
+          >
+            <span aria-hidden="true">
+              <TrashIcon />
+            </span>
+            Remove
+          </button>
+        </div>
+      )}
+
+      {confirmingRemoval && (
+        <div className="contact-dialog-layer">
+          <div
+            data-testid="remove-contacts-dialog"
+            className="contact-confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="remove-contacts-title"
+            aria-describedby="remove-contacts-description"
+          >
+            <div className="contact-confirm-icon">🗑️</div>
+            <h2 id="remove-contacts-title">
+              Remove {selectedCount} {selectedCount === 1 ? "contact" : "contacts"}?
+            </h2>
+            <p id="remove-contacts-description">
+              This removes {selectedCount === 1 ? "this contact" : "these contacts"} from this
+              device. This can’t be undone.
+            </p>
+            <div className="contact-confirm-actions">
+              <button
+                ref={cancelRemovalButtonRef}
+                data-testid="remove-contacts-cancel"
+                type="button"
+                className="btn-light press"
+                onClick={() => {
+                  setConfirmingRemoval(false);
+                  requestAnimationFrame(() => bulkRemoveButtonRef.current?.focus());
                 }}
               >
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "-40%",
-                    left: "-20%",
-                    width: "80%",
-                    height: "120%",
-                    background: "radial-gradient(closest-side, rgba(255,255,255,.28), transparent)",
-                    transform: "rotate(20deg)",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: "-30%",
-                    right: "-15%",
-                    width: "60%",
-                    height: "90%",
-                    background: "radial-gradient(closest-side, rgba(0,0,0,.14), transparent)",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    padding: "20px 22px",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    color: "#fff",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-                    <div
-                      style={{
-                        width: 52,
-                        height: 52,
-                        borderRadius: 16,
-                        background: "rgba(255,255,255,.22)",
-                        backdropFilter: "blur(6px)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 26,
-                        boxShadow: "0 0 0 1px rgba(255,255,255,.25) inset",
-                        flex: "0 0 auto",
-                      }}
-                    >
-                      {p.avatar}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 18,
-                          fontWeight: 800,
-                          letterSpacing: -0.3,
-                          lineHeight: 1,
-                        }}
-                      >
-                        {p.name}
-                      </div>
-                      <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.82, marginTop: 5 }}>
-                        {p.handle}
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        background: "rgba(255,255,255,.2)",
-                        padding: "6px 11px",
-                        borderRadius: 20,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: 0.2,
-                        flex: "0 0 auto",
-                      }}
-                    >
-                      {p.mutuals} mutual
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 500, opacity: 0.92, lineHeight: 1.45 }}>
-                    {p.bio}
-                  </div>
-                </div>
-              </div>
+                Cancel
+              </button>
+              <button
+                data-testid="remove-contacts-confirm"
+                type="button"
+                className="contact-confirm-remove press"
+                onClick={confirmRemoval}
+              >
+                Remove {selectedCount}
+              </button>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

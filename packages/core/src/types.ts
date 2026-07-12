@@ -10,6 +10,15 @@ export type ProviderId =
 export interface Proof {
   readonly provider: ProviderId;
   readonly username: string;
+  /** Compact signed code published on the provider profile. */
+  readonly verificationCode?: string;
+}
+
+export interface IdentityKeyPair {
+  /** Raw Ed25519 public key, encoded as unpadded base64url. */
+  readonly publicKey: string;
+  /** Extractable private-key JWK, encoded as unpadded base64url for local persistence only. */
+  readonly privateKey: string;
 }
 
 /** One of the user's own identities ("cards"). */
@@ -22,6 +31,7 @@ export interface Card {
   readonly tag: string;
   readonly bio: string;
   readonly proofs: readonly Proof[];
+  readonly identity?: IdentityKeyPair;
 }
 
 /** Somebody the user follows. */

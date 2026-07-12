@@ -5,54 +5,105 @@ export type ActivityIcon =
   | { readonly kind: "emoji"; readonly emoji: string; readonly bg: string };
 
 export interface ActivityItem {
+  readonly id: string;
   readonly icon: ActivityIcon;
   readonly title: string;
   readonly sub: string;
-  readonly time: string;
+  readonly occurredAt: number;
 }
 
 export interface ActivityGroup {
-  readonly day: string;
+  readonly day: "Today" | "Yesterday" | "Earlier";
   readonly items: readonly ActivityItem[];
 }
 
-const provider = (p: ProviderId, title: string, sub: string, time: string): ActivityItem => ({
-  icon: { kind: "provider", provider: p },
+const provider = (
+  id: string,
+  p: ProviderId,
+  title: string,
+  sub: string,
+  occurredAt: number,
+): ActivityItem => ({ id, icon: { kind: "provider", provider: p }, title, sub, occurredAt });
+
+const emoji = (
+  id: string,
+  value: string,
+  bg: string,
+  title: string,
+  sub: string,
+  occurredAt: number,
+): ActivityItem => ({
+  id,
+  icon: { kind: "emoji", emoji: value, bg },
   title,
   sub,
-  time,
-});
-const emoji = (e: string, bg: string, title: string, sub: string, time: string): ActivityItem => ({
-  icon: { kind: "emoji", emoji: e, bg },
-  title,
-  sub,
-  time,
+  occurredAt,
 });
 
-export const RECENT_ACTIVITY: readonly ActivityItem[] = [
-  provider("twitter", "Verified your X account", "@finnriver · Everyday", "2m"),
-  provider("github", "Verified your GitHub", "finnriver · Everyday", "1h"),
-  emoji("⚡", "#FFF6DB", "Received a tip", "2,100 sats · Everyday", "3h"),
+export const createInitialActivity = (now = Date.now()): readonly ActivityItem[] => [
+  provider("seed-x", "twitter", "Connected X account", "@finnriver · Everyday", now - 2 * 60_000),
+  provider(
+    "seed-github",
+    "github",
+    "Connected GitHub account",
+    "finnriver · Everyday",
+    now - 60 * 60_000,
+  ),
+  emoji("seed-switch", "🔄", "#EDE7FB", "Switched to Everyday", "from Work", now - 5 * 60 * 60_000),
+  emoji(
+    "seed-backup",
+    "🛡️",
+    "#E9F7EC",
+    "Prepared an encrypted backup",
+    "Work · download requested",
+    now - 26 * 60 * 60_000,
+  ),
+  emoji(
+    "seed-create",
+    "🎭",
+    "#EFEAF7",
+    "Created Anon card",
+    "A separate profile",
+    now - 3 * 24 * 60 * 60_000,
+  ),
 ];
 
-export const ACTIVITY_GROUPS: readonly ActivityGroup[] = [
-  {
-    day: "Today",
-    items: [...RECENT_ACTIVITY, emoji("🔄", "#EDE7FB", "Switched to Everyday", "from Work", "5h")],
-  },
-  {
-    day: "Yesterday",
-    items: [
-      provider("confluence", "Verified on Confluence", "finn@acme · Work", "1d"),
-      emoji("🛡️", "#E9F7EC", "Backup saved", "Work · to iCloud", "1d"),
-      provider("slack", "Verified on Slack", "Acme HQ · Work", "1d"),
-    ],
-  },
-  {
-    day: "Earlier",
-    items: [
-      emoji("🎭", "#EFEAF7", "Created Anon card", "new identity", "3d"),
-      provider("reddit", "Verified on Reddit", "u/finnriver · Everyday", "3d"),
-    ],
-  },
-];
+export const createActivity = (
+  icon: ActivityIcon,
+  title: string,
+  sub: string,
+  occurredAt = Date.now(),
+): ActivityItem => ({ id: crypto.randomUUID(), icon, title, sub, occurredAt });
+
+const startOfDay = (timestamp: number): number => {
+  const date = new Date(timestamp);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+};
+
+export const groupActivity = (
+  items: readonly ActivityItem[],
+  now = Date.now(),
+): readonly ActivityGroup[] => {
+  const today = startOfDay(now);
+  const groups: Record<ActivityGroup["day"], ActivityItem[]> = {
+    Today: [],
+    Yesterday: [],
+    Earlier: [],
+  };
+  for (const item of [...items].sort((a, b) => b.occurredAt - a.occurredAt)) {
+    const days = Math.round((today - startOfDay(item.occurredAt)) / 86_400_000);
+    const day = days <= 0 ? "Today" : days === 1 ? "Yesterday" : "Earlier";
+    groups[day].push(item);
+  }
+  return (["Today", "Yesterday", "Earlier"] as const)
+    .filter((day) => groups[day].length > 0)
+    .map((day) => ({ day, items: groups[day] }));
+};
+
+export const formatActivityTime = (occurredAt: number, now = Date.now()): string => {
+  const elapsed = Math.max(0, now - occurredAt);
+  if (elapsed < 60_000) return "Now";
+  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}m`;
+  if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)}h`;
+  return `${Math.floor(elapsed / 86_400_000)}d`;
+};

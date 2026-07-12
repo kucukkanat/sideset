@@ -6,15 +6,15 @@ import {
   greetingFor,
   PROVIDER_META,
   type Proof,
-  paletteFor,
-  proofsSummary,
   signedDistance,
   wrapIndex,
 } from "@keychain/core";
 import { type MutableRefObject, type ReactElement, useRef, useState } from "react";
-import { RECENT_ACTIVITY } from "../activity.ts";
+import type { ActivityItem } from "../activity.ts";
 import { ActivityRow } from "../components/ActivityRow.tsx";
-import { CheckIcon, LinkIcon, PersonIcon, PlusIcon, ProviderIcon, ScanIcon } from "../icons.tsx";
+import { CardFace } from "../components/CardFace.tsx";
+import { ComingSoon } from "../components/ComingSoon.tsx";
+import { CheckIcon, LinkIcon, PlusIcon, ProviderIcon } from "../icons.tsx";
 
 const CARD_W = 250;
 const CARD_H = 214;
@@ -27,13 +27,16 @@ interface HomeProps {
   carIndex: number;
   onCarIndex: (i: number) => void;
   interactive: boolean;
+  hideFrontCard: boolean;
   frontCardRef: MutableRefObject<HTMLDivElement | null>;
   onActivate: (card: Card) => void;
   onOpenDetail: (id: string, el: HTMLElement | null) => void;
-  onAddProof: () => void;
+  onImport: () => void;
   onCreate: () => void;
+  onConnectAccount: () => void;
   onSeeActivity: () => void;
-  onProofTap: (proof: Proof) => void;
+  onAccountTap: (account: Proof) => void;
+  recentActivity: readonly ActivityItem[];
 }
 
 export const Home = ({
@@ -43,13 +46,16 @@ export const Home = ({
   carIndex,
   onCarIndex,
   interactive,
+  hideFrontCard,
   frontCardRef,
   onActivate,
   onOpenDetail,
-  onAddProof,
+  onImport,
   onCreate,
+  onConnectAccount,
   onSeeActivity,
-  onProofTap,
+  onAccountTap,
+  recentActivity,
 }: HomeProps): ReactElement => {
   const [drag, setDrag] = useState({ x: 0, dragging: false });
   const moved = useRef(false);
@@ -111,24 +117,27 @@ export const Home = ({
   };
 
   return (
-    <div className="scr screen">
+    <div data-testid="screen-home" className="scr screen">
       <div className="screen-hdr">
         <div>
           <div className="hdr-sub">{greetingFor(new Date().getHours())}</div>
           <div className="hdr-title">Wallet</div>
         </div>
-        <div
-          role="button"
+        <button
+          type="button"
+          data-testid="home-import-profile"
+          aria-label="Import a profile"
           className="round-btn press"
-          style={{ ["--press" as string]: 0.9 }}
-          onClick={onAddProof}
+          style={{ border: "none", ["--press" as string]: 0.9 }}
+          onClick={onImport}
         >
-          <ScanIcon />
-        </div>
+          <PlusIcon stroke="var(--kc-heading)" size={22} width={2.2} />
+        </button>
       </div>
 
       {/* CARD CAROUSEL */}
       <div
+        data-testid="home-card-carousel"
         onPointerDown={onCarStart}
         style={{
           position: "relative",
@@ -142,14 +151,16 @@ export const Home = ({
       >
         <div style={{ position: "absolute", inset: 0, transformStyle: "preserve-3d" }}>
           {cards.map((c, i) => {
-            const p = paletteFor(c.color);
             const rel = signedDistance(i, pos, n);
             const isFront = i === front;
             const pl = cardPlacement(rel);
             return (
               <div
+                data-testid={`home-card-${c.id}`}
                 key={c.id}
                 role="button"
+                tabIndex={pl.opacity === 0 ? -1 : 0}
+                aria-current={isFront ? "true" : undefined}
                 ref={
                   isFront
                     ? (el) => {
@@ -163,6 +174,13 @@ export const Home = ({
                   else if (c.id === activeId) onOpenDetail(c.id, e.currentTarget);
                   else onActivate(c);
                 }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  if (!isFront) onCarIndex(i);
+                  else if (c.id === activeId) onOpenDetail(c.id, event.currentTarget);
+                  else onActivate(c);
+                }}
                 style={{
                   position: "absolute",
                   top: 24,
@@ -173,6 +191,7 @@ export const Home = ({
                   transform: `translateX(${pl.x}px) translateZ(${pl.translateZ}px) rotateY(${pl.rotateY}deg) scale(${pl.scale})`,
                   zIndex: pl.zIndex,
                   opacity: pl.opacity,
+                  visibility: isFront && hideFrontCard ? "hidden" : "visible",
                   cursor: "pointer",
                   transition: drag.dragging
                     ? "none"
@@ -180,155 +199,12 @@ export const Home = ({
                   willChange: "transform",
                 }}
               >
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    borderRadius: 24,
-                    background: p.grad,
-                    overflow: "hidden",
-                    boxShadow: `0 22px 46px -18px ${p.shadow},0 2px 6px rgba(0,0,0,.12),0 0 0 1px rgba(255,255,255,.14) inset`,
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-40%",
-                      left: "-20%",
-                      width: "80%",
-                      height: "120%",
-                      background:
-                        "radial-gradient(closest-side, rgba(255,255,255,.28), transparent)",
-                      transform: "rotate(20deg)",
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: "-30%",
-                      right: "-15%",
-                      width: "60%",
-                      height: "90%",
-                      background: "radial-gradient(closest-side, rgba(0,0,0,.14), transparent)",
-                    }}
-                  />
-                  {/* dim overlay for off-centre cards */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: "#0A0908",
-                      opacity: pl.dim,
-                      transition: drag.dragging ? "none" : `opacity .6s ${CAR_EASE}`,
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      padding: "18px 20px",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      color: "#fff",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                        <div
-                          style={{
-                            width: 42,
-                            height: 42,
-                            borderRadius: 13,
-                            background: "rgba(255,255,255,.22)",
-                            backdropFilter: "blur(6px)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 22,
-                            boxShadow: "0 0 0 1px rgba(255,255,255,.25) inset",
-                          }}
-                        >
-                          {c.avatar}
-                        </div>
-                        <div>
-                          <div
-                            style={{
-                              fontSize: 17,
-                              fontWeight: 700,
-                              letterSpacing: -0.2,
-                              lineHeight: 1,
-                            }}
-                          >
-                            {c.name}
-                          </div>
-                          <div
-                            style={{ fontSize: 12.5, fontWeight: 500, opacity: 0.82, marginTop: 4 }}
-                          >
-                            {c.tag}
-                          </div>
-                        </div>
-                      </div>
-                      {c.id === activeId && (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 5,
-                            background: "rgba(255,255,255,.2)",
-                            padding: "5px 10px 5px 8px",
-                            borderRadius: 20,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            letterSpacing: 0.2,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 7,
-                              height: 7,
-                              borderRadius: "50%",
-                              background: "#8FF0A4",
-                              boxShadow: "0 0 8px #8FF0A4",
-                            }}
-                          />
-                          ACTIVE
-                        </div>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-end",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <div>
-                        <div
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 600,
-                            opacity: 0.7,
-                            letterSpacing: 1.5,
-                          }}
-                        >
-                          VERIFIED ON
-                        </div>
-                        <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.95, marginTop: 3 }}>
-                          {proofsSummary(c.proofs)}
-                        </div>
-                      </div>
-                      <PersonIcon />
-                    </div>
-                  </div>
-                </div>
+                <CardFace
+                  card={c}
+                  active={c.id === activeId}
+                  dim={pl.dim}
+                  dimTransition={drag.dragging ? "none" : `opacity .6s ${CAR_EASE}`}
+                />
               </div>
             );
           })}
@@ -347,11 +223,16 @@ export const Home = ({
           }}
         >
           {cards.map((c, i) => (
-            <div
+            <button
+              type="button"
               key={c.id}
-              role="button"
+              data-testid={`home-card-indicator-${c.id}`}
+              aria-label={`Show ${c.name} card`}
+              aria-pressed={i === front}
               onClick={() => onCarIndex(i)}
               style={{
+                border: 0,
+                padding: 0,
                 width: i === front ? 20 : 7,
                 height: 7,
                 borderRadius: 4,
@@ -366,6 +247,7 @@ export const Home = ({
 
       {/* QUICK ACTIONS */}
       <div
+        data-testid="home-quick-actions"
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
@@ -380,24 +262,39 @@ export const Home = ({
               bg: "#E9F7EC",
               icon: <PlusIcon stroke="#1E8A4C" size={18} width={2.2} />,
               onTap: onCreate,
+              available: true,
             },
-            { label: "Add proof", bg: "#E8F0FF", icon: <LinkIcon />, onTap: onAddProof },
+            {
+              label: "Connect account",
+              bg: "#E8F0FF",
+              icon: <LinkIcon />,
+              available: true,
+              onTap: onConnectAccount,
+            },
           ] as const
         ).map((q) => (
-          <div
+          <button
+            type="button"
             key={q.label}
-            role="button"
-            className="press"
-            onClick={q.onTap}
+            data-testid={`home-action-${q.label.toLowerCase().replaceAll(" ", "-")}`}
+            data-theme-surface="card"
+            className={q.available ? "press" : undefined}
+            disabled={!q.available}
+            aria-disabled={!q.available}
+            onClick={q.available ? q.onTap : undefined}
             style={{
-              background: "#FFF",
+              background: "var(--kc-surface)",
+              border: "none",
               borderRadius: 18,
               padding: "14px 8px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
+              justifyContent: "center",
               gap: 8,
               boxShadow: "0 3px 10px -4px rgba(80,50,20,.16)",
+              opacity: q.available ? 1 : 0.5,
+              cursor: q.available ? "pointer" : "not-allowed",
               ["--press" as string]: 0.94,
             }}
           >
@@ -414,13 +311,19 @@ export const Home = ({
             >
               {q.icon}
             </div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#3A322A" }}>{q.label}</div>
-          </div>
+            <div
+              data-theme-text="primary"
+              style={{ fontSize: 12.5, fontWeight: 700, color: "var(--kc-text)" }}
+            >
+              {q.label}
+            </div>
+            {!q.available && <ComingSoon />}
+          </button>
         ))}
       </div>
 
-      {/* VERIFIED IDENTITIES */}
-      <div style={{ padding: "22px 0 4px" }}>
+      {/* CONNECTED ACCOUNTS */}
+      <div data-testid="home-connected-accounts" style={{ padding: "22px 0 4px" }}>
         <div
           style={{
             display: "flex",
@@ -431,13 +334,21 @@ export const Home = ({
         >
           <div>
             <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: -0.3 }}>
-              Verified identities
+              Connected accounts
             </div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#A08E78", marginTop: 2 }}>
-              Proof this is really you
+            <div
+              data-theme-text="muted"
+              style={{ fontSize: 12, fontWeight: 600, color: "var(--kc-subtle)", marginTop: 2 }}
+            >
+              Accounts shown on this card
             </div>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#A08E78" }}>{active.name}</div>
+          <div
+            data-theme-text="muted"
+            style={{ fontSize: 13, fontWeight: 700, color: "var(--kc-subtle)" }}
+          >
+            {active.name}
+          </div>
         </div>
         <div
           className="scr"
@@ -446,15 +357,18 @@ export const Home = ({
           {active.proofs.map((proof) => {
             const meta = PROVIDER_META[proof.provider];
             return (
-              <div
+              <button
+                type="button"
                 key={proof.provider}
-                role="button"
+                data-testid={`home-account-${proof.provider}`}
+                data-theme-surface="card"
                 className="press"
-                onClick={() => onProofTap(proof)}
+                onClick={() => onAccountTap(proof)}
                 style={{
                   flex: "0 0 auto",
                   width: 110,
-                  background: "#FFF",
+                  background: "var(--kc-surface)",
+                  border: "none",
                   borderRadius: 18,
                   padding: "14px 10px 12px",
                   display: "flex",
@@ -502,7 +416,7 @@ export const Home = ({
                     style={{
                       fontSize: 12,
                       fontWeight: 800,
-                      color: "#241F1B",
+                      color: "var(--kc-text)",
                       lineHeight: 1.1,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -511,17 +425,26 @@ export const Home = ({
                   >
                     {proof.username}
                   </div>
-                  <div style={{ fontSize: 10.5, fontWeight: 600, color: "#A08E78", marginTop: 2 }}>
+                  <div
+                    data-theme-text="muted"
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      color: "var(--kc-subtle)",
+                      marginTop: 2,
+                    }}
+                  >
                     {meta.name}
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
-          <div
-            role="button"
-            className="press"
-            onClick={onAddProof}
+          <button
+            type="button"
+            data-testid="home-connect-account"
+            data-theme-surface="card"
+            onClick={onConnectAccount}
             style={{
               flex: "0 0 auto",
               width: 110,
@@ -534,8 +457,9 @@ export const Home = ({
               alignItems: "center",
               justifyContent: "center",
               gap: 9,
-              color: "#A08E78",
-              ["--press" as string]: 0.94,
+              color: "var(--kc-subtle)",
+              cursor: "pointer",
+              fontFamily: "inherit",
             }}
           >
             <div
@@ -552,14 +476,14 @@ export const Home = ({
               <PlusIcon />
             </div>
             <div style={{ fontSize: 11.5, fontWeight: 700, textAlign: "center", lineHeight: 1.15 }}>
-              Add proof
+              Connect account
             </div>
-          </div>
+          </button>
         </div>
       </div>
 
       {/* RECENT ACTIVITY */}
-      <div style={{ padding: "22px 24px 0" }}>
+      <div data-testid="home-recent-activity" style={{ padding: "22px 24px 0" }}>
         <div
           style={{
             display: "flex",
@@ -569,18 +493,30 @@ export const Home = ({
           }}
         >
           <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: -0.3 }}>Recent</div>
-          <div
-            role="button"
+          <button
+            type="button"
+            data-testid="home-see-all-activity"
             onClick={onSeeActivity}
-            style={{ fontSize: 13, fontWeight: 700, color: "#E8502A", cursor: "pointer" }}
+            style={{
+              border: "none",
+              background: "transparent",
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--kc-accent, #E8502A)",
+              cursor: "pointer",
+            }}
           >
             See all
-          </div>
+          </button>
         </div>
         <div className="panel">
-          {RECENT_ACTIVITY.map((item) => (
-            <ActivityRow key={item.title} item={item} />
-          ))}
+          {recentActivity.length > 0 ? (
+            recentActivity.map((item) => <ActivityRow key={item.id} item={item} />)
+          ) : (
+            <div className="row-sub" style={{ padding: 18, textAlign: "center" }}>
+              Your latest changes will appear here.
+            </div>
+          )}
         </div>
       </div>
     </div>

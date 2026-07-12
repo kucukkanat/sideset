@@ -14,7 +14,7 @@ export const EditSheet = ({
   const pal = paletteFor(card.color);
 
   return (
-    <div style={{ animation: "riseIn .4s ease" }}>
+    <div data-testid="edit-card-sheet" style={{ animation: "riseIn .4s ease" }}>
       <div style={{ textAlign: "center" }}>
         <div className="sheet-title">Edit card</div>
       </div>
@@ -47,6 +47,7 @@ export const EditSheet = ({
         {EMOJI_CHOICES.map((emoji) => (
           <div
             key={emoji}
+            data-testid={`edit-card-avatar-${emoji}`}
             role="button"
             onClick={() => setAvatar(emoji)}
             style={{
@@ -72,7 +73,9 @@ export const EditSheet = ({
           Name
         </div>
         <input
+          data-testid="edit-card-name"
           className="input"
+          maxLength={50}
           style={{ padding: 15 }}
           value={name}
           onInput={(e) => setName(e.currentTarget.value)}
@@ -83,7 +86,9 @@ export const EditSheet = ({
           About you
         </div>
         <textarea
+          data-testid="edit-card-bio"
           className="input"
+          maxLength={280}
           rows={3}
           style={{ padding: 15, fontSize: 15, fontWeight: 600, resize: "none", lineHeight: 1.5 }}
           value={bio}
@@ -92,6 +97,7 @@ export const EditSheet = ({
       </div>
       <div
         role="button"
+        data-testid="edit-card-save"
         className="btn-dark press"
         onClick={() => onSave({ name, bio, avatar })}
         style={{ marginTop: 22, ["--press" as string]: 0.97 }}

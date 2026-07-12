@@ -18,17 +18,21 @@ export const BottomNav = ({
   onGo: (key: NavKey) => void;
 }): ReactElement => (
   <div
+    data-testid="bottom-navigation"
+    className="bottom-nav"
     style={{
       position: "absolute",
       bottom: 0,
       left: 0,
       right: 0,
       zIndex: 55,
-      padding: "8px 16px 26px",
+      padding: "8px 16px calc(26px + env(safe-area-inset-bottom))",
       background: "linear-gradient(to top,#F4EFE8 60%,rgba(244,239,232,0))",
     }}
   >
     <div
+      data-testid="bottom-navigation-inner"
+      className="bottom-nav-inner"
       style={{
         display: "flex",
         alignItems: "center",
@@ -43,12 +47,17 @@ export const BottomNav = ({
       {ITEMS.map((item) => {
         const on = current === item.key;
         return (
-          <div
+          <button
+            type="button"
             key={item.key}
-            role="button"
+            data-testid={`nav-${item.key}`}
+            aria-current={on ? "page" : undefined}
             className="press"
             onClick={() => onGo(item.key)}
             style={{
+              border: 0,
+              background: "transparent",
+              fontFamily: "inherit",
               flex: 1,
               display: "flex",
               flexDirection: "column",
@@ -59,11 +68,19 @@ export const BottomNav = ({
               ["--press" as string]: 0.88,
             }}
           >
-            <div style={{ height: 24, display: "flex", alignItems: "center" }}>
+            <div
+              data-testid={`nav-${item.key}-icon`}
+              style={{ height: 24, display: "flex", alignItems: "center" }}
+            >
               <NavIcon kind={item.icon} active={on} />
             </div>
-            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.1 }}>{item.label}</div>
-          </div>
+            <div
+              data-testid={`nav-${item.key}-label`}
+              style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.1 }}
+            >
+              {item.label}
+            </div>
+          </button>
         );
       })}
     </div>

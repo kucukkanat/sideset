@@ -1,7 +1,8 @@
-import { type Card, type Contact, paletteFor, proofsSummary } from "@keychain/core";
+import { type Card, type Contact, paletteFor } from "@keychain/core";
 import type { CSSProperties, ReactElement } from "react";
 import { FALLBACK_CARD_RECT, type Flip } from "../flip.ts";
 import { BackIcon, EditIcon } from "../icons.tsx";
+import { CardFace } from "./CardFace.tsx";
 
 const isContact = (s: Card | Contact): s is Contact => "mutuals" in s;
 
@@ -18,8 +19,8 @@ export const FlipOverlay = ({
   subject: Card | Contact;
 }): ReactElement => {
   const pal = paletteFor(subject.color);
-  const tag = isContact(subject) ? subject.handle : subject.tag;
-  const summary = isContact(subject) ? `${subject.mutuals} mutual` : proofsSummary(subject.proofs);
+  const contact = isContact(subject);
+  const tag = contact ? subject.handle : subject.tag;
   const bio = subject.bio || "No bio yet — tap edit to add one.";
 
   const box = flip.phase === "end" && flip.target ? flip.target : (flip.rect ?? FALLBACK_CARD_RECT);
@@ -55,6 +56,8 @@ export const FlipOverlay = ({
 
   return (
     <div
+      data-testid="flip-overlay"
+      aria-hidden="true"
       style={{
         position: "absolute",
         inset: 0,
@@ -63,68 +66,77 @@ export const FlipOverlay = ({
         pointerEvents: "none",
       }}
     >
-      <div style={inner}>
+      <div data-testid="flip-card" style={inner}>
         {/* FRONT: the card as it sat in the stack */}
-        <div
-          style={{
-            ...face,
-            boxShadow: `0 30px 60px -20px ${pal.shadow},0 0 0 1px rgba(255,255,255,.14) inset`,
-          }}
-        >
+        {contact ? (
           <div
             style={{
-              position: "absolute",
-              top: "-40%",
-              left: "-20%",
-              width: "80%",
-              height: "120%",
-              background: "radial-gradient(closest-side, rgba(255,255,255,.28), transparent)",
-              transform: "rotate(20deg)",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              padding: "18px 20px",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              color: "#fff",
+              ...face,
+              boxShadow: `0 30px 60px -20px ${pal.shadow},0 0 0 1px rgba(255,255,255,.14) inset`,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-              <div
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 13,
-                  background: "rgba(255,255,255,.22)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  boxShadow: "0 0 0 1px rgba(255,255,255,.25) inset",
-                }}
-              >
-                {subject.avatar}
-              </div>
-              <div>
-                <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1 }}>{subject.name}</div>
-                <div style={{ fontSize: 12.5, fontWeight: 500, opacity: 0.82, marginTop: 4 }}>
-                  {tag}
+            <div
+              style={{
+                position: "absolute",
+                top: "-40%",
+                left: "-20%",
+                width: "80%",
+                height: "120%",
+                background: "radial-gradient(closest-side, rgba(255,255,255,.28), transparent)",
+                transform: "rotate(20deg)",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                padding: "18px 20px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                color: "#fff",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 13,
+                    background: "rgba(255,255,255,.22)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 22,
+                    boxShadow: "0 0 0 1px rgba(255,255,255,.25) inset",
+                  }}
+                >
+                  {subject.avatar}
+                </div>
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1 }}>{subject.name}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, opacity: 0.82, marginTop: 4 }}>
+                    {tag}
+                  </div>
                 </div>
               </div>
+              <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.95 }}>
+                {subject.mutuals} mutual
+              </div>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.95 }}>{summary}</div>
           </div>
-        </div>
+        ) : (
+          <div style={{ ...face, overflow: "visible", background: "transparent" }}>
+            {/* Card detail is only entered from the active carousel card. */}
+            <CardFace card={subject} active borderRadius="inherit" />
+          </div>
+        )}
         {/* BACK: an exact clone of the detail hero, so the swap is invisible */}
         <div
+          className="flip-detail-hero"
           style={{
             ...face,
             transform: "rotateY(180deg)",
-            padding: "60px 20px 26px",
             boxShadow: `0 30px 60px -20px ${pal.shadow}`,
           }}
         >

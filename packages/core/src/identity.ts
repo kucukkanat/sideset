@@ -3,7 +3,7 @@ import type { Proof } from "./types.ts";
 
 /** "X · GitHub +2" — the short proof list shown on a card face. */
 export const proofsSummary = (proofs: readonly Proof[]): string => {
-  if (proofs.length === 0) return "No proofs yet";
+  if (proofs.length === 0) return "No accounts connected";
   const names = proofs.map((p) => PROVIDER_META[p.provider].name);
   if (names.length <= 2) return names.join(" · ");
   return `${names.slice(0, 2).join(" · ")} +${names.length - 2}`;

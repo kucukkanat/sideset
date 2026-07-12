@@ -1,10 +1,10 @@
 import { PROVIDER_META } from "@keychain/core";
 import type { ReactElement } from "react";
-import type { ActivityItem } from "../activity.ts";
+import { type ActivityItem, formatActivityTime } from "../activity.ts";
 import { ProviderIcon } from "../icons.tsx";
 
 export const ActivityRow = ({ item }: { item: ActivityItem }): ReactElement => (
-  <div className="row">
+  <div data-testid={`activity-row-${item.id}`} className="row">
     <div
       className="row-icon"
       style={{
@@ -18,10 +18,16 @@ export const ActivityRow = ({ item }: { item: ActivityItem }): ReactElement => (
         item.icon.emoji
       )}
     </div>
-    <div className="row-body">
-      <div className="row-title">{item.title}</div>
-      <div className="row-sub">{item.sub}</div>
+    <div data-testid={`activity-row-${item.id}-body`} className="row-body">
+      <div data-testid={`activity-row-${item.id}-title`} className="row-title">
+        {item.title}
+      </div>
+      <div data-testid={`activity-row-${item.id}-subtitle`} className="row-sub">
+        {item.sub}
+      </div>
     </div>
-    <div className="row-time">{item.time}</div>
+    <div data-testid={`activity-row-${item.id}-time`} className="row-time">
+      {formatActivityTime(item.occurredAt)}
+    </div>
   </div>
 );

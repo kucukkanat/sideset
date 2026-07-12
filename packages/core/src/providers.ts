@@ -1,4 +1,4 @@
-import type { ProviderId, ProviderMeta } from "./types.ts";
+import type { Proof, ProviderId, ProviderMeta } from "./types.ts";
 
 export const PROVIDER_META: Record<ProviderId, ProviderMeta> = {
   twitter: { name: "X", bg: "#EAEAEB", fg: "#0A0A0A", shadow: "rgba(0,0,0,.25)" },
@@ -42,5 +42,26 @@ export const proofUserFor = (
       return `${base}@acme`;
     case "github":
       return base;
+  }
+};
+
+/** Opens the most specific provider-owned destination available for a manual proof check. */
+export const proofVerificationUrl = ({ provider, username }: Proof): string => {
+  const user = username.trim();
+  switch (provider) {
+    case "twitter":
+      return `https://x.com/${encodeURIComponent(user.replace(/^@/u, ""))}`;
+    case "github":
+      return `https://github.com/${encodeURIComponent(user)}`;
+    case "reddit":
+      return `https://www.reddit.com/user/${encodeURIComponent(user.replace(/^u\//u, ""))}`;
+    case "facebook":
+      return `https://www.facebook.com/search/people/?q=${encodeURIComponent(user)}`;
+    case "slack":
+      return "https://slack.com/signin";
+    case "confluence":
+      return "https://id.atlassian.com/login";
+    case "email":
+      return `mailto:${encodeURIComponent(user)}`;
   }
 };

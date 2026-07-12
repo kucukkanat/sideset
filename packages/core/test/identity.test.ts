@@ -5,13 +5,14 @@ import {
   passStrength,
   proofsSummary,
   proofUserFor,
+  proofVerificationUrl,
   STRENGTH_COLORS,
   STRENGTH_LABELS,
 } from "@keychain/core";
 
 describe("proofsSummary", () => {
   test("empty list", () => {
-    expect(proofsSummary([])).toBe("No proofs yet");
+    expect(proofsSummary([])).toBe("No accounts connected");
   });
   test("one or two proofs join with a dot", () => {
     expect(proofsSummary([{ provider: "twitter", username: "@a" }])).toBe("X");
@@ -82,5 +83,34 @@ describe("proofUserFor", () => {
   });
   test("falls back to normalised name when handle is empty", () => {
     expect(proofUserFor({ name: "Finn River", handle: "" }, "github")).toBe("finnriver");
+  });
+});
+
+describe("proofVerificationUrl", () => {
+  test("links directly to public provider profiles", () => {
+    expect(proofVerificationUrl({ provider: "twitter", username: " @finn river " })).toBe(
+      "https://x.com/finn%20river",
+    );
+    expect(proofVerificationUrl({ provider: "github", username: "finnriver" })).toBe(
+      "https://github.com/finnriver",
+    );
+    expect(proofVerificationUrl({ provider: "reddit", username: "u/finnriver" })).toBe(
+      "https://www.reddit.com/user/finnriver",
+    );
+  });
+
+  test("uses provider-owned fallback destinations when profiles are not addressable", () => {
+    expect(proofVerificationUrl({ provider: "facebook", username: "Finn River" })).toBe(
+      "https://www.facebook.com/search/people/?q=Finn%20River",
+    );
+    expect(proofVerificationUrl({ provider: "slack", username: "Acme HQ" })).toBe(
+      "https://slack.com/signin",
+    );
+    expect(proofVerificationUrl({ provider: "confluence", username: "finn@acme" })).toBe(
+      "https://id.atlassian.com/login",
+    );
+    expect(proofVerificationUrl({ provider: "email", username: "finn@hey.com" })).toBe(
+      "mailto:finn%40hey.com",
+    );
   });
 });

@@ -1,6 +1,20 @@
-import { type Card, passStrength, STRENGTH_COLORS, STRENGTH_LABELS } from "@keychain/core";
+import { type Card, passStrength, STRENGTH_LABELS } from "@keychain/core";
+import {
+  Archive,
+  Check,
+  ChevronRight,
+  Download,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  UsersRound,
+  WalletCards,
+} from "lucide-react";
 import { type FormEvent, type ReactElement, useEffect, useState } from "react";
-import { CheckIcon, ShieldIcon } from "../icons.tsx";
+import { CardAvatar } from "../components/CardAvatar.tsx";
 
 export type BackupSaveResult =
   | { readonly ok: true; readonly contents: string; readonly filename: string }
@@ -16,6 +30,12 @@ interface BackupDownload {
   readonly href: string;
   readonly filename: string;
 }
+
+const Toggle = ({ checked }: { checked: boolean }): ReactElement => (
+  <span className="backup-toggle" aria-hidden="true" data-checked={checked}>
+    <span />
+  </span>
+);
 
 export const BackupSheet = ({
   cards,
@@ -38,7 +58,7 @@ export const BackupSheet = ({
   const [settings, setSettings] = useState(true);
   const [contacts, setContacts] = useState(true);
   const strength = passStrength(password);
-  const strengthColor = STRENGTH_COLORS[Math.min(strength - 1, 2)] ?? "#B6A78E";
+  const selectedCount = cardIds.length + Number(settings) + Number(contacts);
 
   useEffect(
     () => () => {
@@ -66,235 +86,224 @@ export const BackupSheet = ({
     setPassword("");
     setStep("done");
   };
+
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     void save();
   };
 
-  return (
-    <form data-testid="backup-sheet" onSubmit={submit} style={{ animation: "riseIn .4s ease" }}>
-      {(step === "intro" || step === "saving") && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              width: 76,
-              height: 76,
-              borderRadius: 24,
-              background: "#E8F0FF",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 10px 22px -10px rgba(46,107,230,.5)",
-            }}
-          >
-            <ShieldIcon size={40} width={1.8} />
-          </div>
-          <div className="sheet-title" style={{ marginTop: 18 }}>
-            Save a local backup
-          </div>
-          <div className="sheet-lead" style={{ marginTop: 8, maxWidth: 300, lineHeight: 1.5 }}>
-            Choose what to include, then download one encrypted app backup.
-          </div>
-          <fieldset
-            style={{ width: "100%", marginTop: 22, textAlign: "left", border: 0, padding: 0 }}
-          >
-            <legend className="sec-label">Identities</legend>
-            {cards.map((card) => (
-              <label key={card.id} style={{ display: "flex", gap: 10, padding: "9px 0" }}>
-                <input
-                  data-testid={`backup-card-${card.id}`}
-                  type="checkbox"
-                  checked={cardIds.includes(card.id)}
-                  onChange={() =>
-                    setCardIds((selected) =>
-                      selected.includes(card.id)
-                        ? selected.filter((id) => id !== card.id)
-                        : [...selected, card.id],
-                    )
-                  }
-                />
-                {card.name}
-              </label>
-            ))}
-            <label style={{ display: "flex", gap: 10, padding: "9px 0" }}>
-              <input
-                data-testid="backup-settings"
-                type="checkbox"
-                checked={settings}
-                onChange={(event) => setSettings(event.currentTarget.checked)}
-              />
-              Settings
-            </label>
-            <label style={{ display: "flex", gap: 10, padding: "9px 0" }}>
-              <input
-                data-testid="backup-contacts"
-                type="checkbox"
-                checked={contacts}
-                onChange={(event) => setContacts(event.currentTarget.checked)}
-              />
-              All contacts ({contactCount})
-            </label>
-          </fieldset>
-          <div style={{ width: "100%", marginTop: 22, textAlign: "left" }}>
-            <label className="sec-label" htmlFor="backup-password" style={{ display: "block" }}>
-              Backup password
-            </label>
-            <div style={{ position: "relative" }}>
-              <input
-                data-testid="backup-password"
-                id="backup-password"
-                className="input"
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                maxLength={256}
-                placeholder="At least 8 characters"
-                style={{ padding: "16px 52px 16px 16px" }}
-                value={password}
-                disabled={step === "saving"}
-                onInput={(event) => setPassword(event.currentTarget.value)}
-              />
-              <button
-                type="button"
-                data-testid="backup-password-toggle"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                onClick={() => setShowPassword((visible) => !visible)}
-                disabled={step === "saving"}
-                style={{
-                  position: "absolute",
-                  right: 8,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  width: 42,
-                  height: 42,
-                  border: 0,
-                  background: "transparent",
-                  fontSize: 19,
-                  cursor: "pointer",
-                  opacity: 0.55,
-                }}
-              >
-                {showPassword ? "🙈" : "👁️"}
-              </button>
-            </div>
-            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-              {[0, 1, 2].map((index) => (
-                <div
-                  key={index}
-                  style={{
-                    flex: 1,
-                    height: 5,
-                    borderRadius: 3,
-                    transition: "background .25s",
-                    background: index < strength ? strengthColor : "#E4DBCC",
-                  }}
-                />
-              ))}
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: strength > 0 ? strengthColor : "#B6A78E",
-                marginTop: 7,
-              }}
-            >
-              {password
-                ? STRENGTH_LABELS[strength]
-                : "Use mixed-case letters and a number or symbol"}
-            </div>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              background: "var(--kc-warning-bg)",
-              borderRadius: 14,
-              padding: "13px 15px",
-              marginTop: 18,
-              width: "100%",
-            }}
-          >
-            <span style={{ fontSize: 18 }}>💡</span>
-            <div
-              style={{
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: "var(--kc-warning-text)",
-                textAlign: "left",
-                lineHeight: 1.4,
-              }}
-            >
-              This password never leaves your device and can’t be reset.
-            </div>
-          </div>
-          <button
-            type="submit"
-            data-testid="backup-create"
-            className="btn-dark press"
-            disabled={
-              step === "saving" || strength < 2 || (cardIds.length === 0 && !settings && !contacts)
-            }
-            style={{
-              marginTop: 20,
-              border: 0,
-              background: "#2E6BE6",
-              opacity: step === "saving" || strength < 2 ? 0.45 : 1,
-              ["--press" as string]: 0.97,
-            }}
-          >
-            {step === "saving" ? "Encrypting…" : "Create backup file"}
-          </button>
+  if (step === "done") {
+    return (
+      <div data-testid="backup-complete" className="backup-done">
+        <div className="backup-done-orbit" aria-hidden="true">
+          <span className="backup-done-check">
+            <Check size={34} strokeWidth={3} />
+          </span>
+          <span className="backup-spark backup-spark-one" />
+          <span className="backup-spark backup-spark-two" />
+          <span className="backup-spark backup-spark-three" />
         </div>
-      )}
-      {step === "done" && (
-        <div data-testid="backup-complete" className="done-pop">
-          <div className="check-bubble">
-            <CheckIcon size={44} width={3} />
+        <div className="backup-done-kicker">
+          <ShieldCheck size={14} /> Encrypted on this device
+        </div>
+        <div className="sheet-title">Backup prepared</div>
+        <div className="sheet-lead backup-done-lead">
+          One last step: download the file and keep it somewhere only you can access.
+        </div>
+        {download !== null && (
+          <a
+            data-testid="backup-download"
+            className="backup-primary press"
+            href={download.href}
+            download={download.filename}
+          >
+            <Download size={19} strokeWidth={2.3} />
+            Download backup file
+          </a>
+        )}
+        <div className="backup-file-pill">
+          <Archive size={17} />
+          <span>{download?.filename}</span>
+          <Check size={16} />
+        </div>
+        <button
+          type="button"
+          data-testid="backup-done"
+          className="backup-secondary press"
+          onClick={onDone}
+        >
+          Done
+        </button>
+      </div>
+    );
+  }
+
+  const disabled = step === "saving";
+  return (
+    <form data-testid="backup-sheet" className="backup-flow" onSubmit={submit}>
+      <header className="backup-hero">
+        <div className="backup-brand-lockup">
+          <img src="./assets/brand/sideset-mark.png" alt="" />
+          <span>SIDEST</span>
+        </div>
+        <div className="backup-hero-icon" aria-hidden="true">
+          <ShieldCheck size={28} strokeWidth={1.9} />
+        </div>
+        <div>
+          <div className="backup-eyebrow">PRIVATE BY DESIGN</div>
+          <h2 className="sheet-title">Save a local backup</h2>
+          <p className="sheet-lead">Bundle your wallet into one encrypted file you control.</p>
+        </div>
+      </header>
+
+      <section className="backup-section" aria-labelledby="backup-include-title">
+        <div className="backup-section-heading">
+          <div>
+            <span className="backup-step">1</span>
+            <span id="backup-include-title">Choose what to protect</span>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, marginTop: 20 }}>Backup prepared</div>
-          <div className="sheet-lead" style={{ maxWidth: 275 }}>
-            Your encrypted file is ready. Download it, then keep the file and its password somewhere
-            safe.
+          <span>{selectedCount} selected</span>
+        </div>
+        <div className="backup-options">
+          <div className="backup-option backup-identities">
+            <div className="backup-option-icon">
+              <WalletCards size={19} />
+            </div>
+            <div className="backup-option-copy">
+              <strong>Identities</strong>
+              <span>
+                {cardIds.length} of {cards.length} included
+              </span>
+            </div>
+            <ChevronRight size={18} className="backup-chevron" />
           </div>
-          {download !== null && (
-            <a
-              data-testid="backup-download"
-              className="btn-dark press"
-              href={download.href}
-              download={download.filename}
-              style={{
-                marginTop: 24,
-                textDecoration: "none",
-                ["--press" as string]: 0.97,
-              }}
-            >
-              Download backup file
-            </a>
-          )}
+          <div className="backup-avatar-row" role="group" aria-label="Choose identities">
+            {cards.map((card) => {
+              const checked = cardIds.includes(card.id);
+              return (
+                <label key={card.id} className="backup-avatar-choice" data-checked={checked}>
+                  <input
+                    data-testid={`backup-card-${card.id}`}
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={() =>
+                      setCardIds((selected) =>
+                        selected.includes(card.id)
+                          ? selected.filter((id) => id !== card.id)
+                          : [...selected, card.id],
+                      )
+                    }
+                  />
+                  <span className="backup-avatar-wrap">
+                    <CardAvatar card={card} style={{ width: 42, height: 42, fontSize: 22 }} />
+                    <span className="backup-avatar-check">
+                      <Check size={11} strokeWidth={3.5} />
+                    </span>
+                  </span>
+                  <span>{card.name}</span>
+                </label>
+              );
+            })}
+          </div>
+          <label className="backup-option">
+            <input
+              data-testid="backup-contacts"
+              type="checkbox"
+              checked={contacts}
+              disabled={disabled}
+              onChange={(event) => setContacts(event.currentTarget.checked)}
+            />
+            <div className="backup-option-icon">
+              <UsersRound size={19} />
+            </div>
+            <div className="backup-option-copy">
+              <strong>Contacts</strong>
+              <span>{contactCount} people</span>
+            </div>
+            <Toggle checked={contacts} />
+          </label>
+          <label className="backup-option">
+            <input
+              data-testid="backup-settings"
+              type="checkbox"
+              checked={settings}
+              disabled={disabled}
+              onChange={(event) => setSettings(event.currentTarget.checked)}
+            />
+            <div className="backup-option-icon">
+              <Settings2 size={19} />
+            </div>
+            <div className="backup-option-copy">
+              <strong>Preferences</strong>
+              <span>Theme &amp; app settings</span>
+            </div>
+            <Toggle checked={settings} />
+          </label>
+        </div>
+      </section>
+
+      <section className="backup-section" aria-labelledby="backup-password-title">
+        <div className="backup-section-heading">
+          <div>
+            <span className="backup-step">2</span>
+            <span id="backup-password-title">Lock your backup</span>
+          </div>
+        </div>
+        <div className="backup-password-wrap" data-strength={strength}>
+          <LockKeyhole size={19} className="backup-password-icon" />
+          <input
+            data-testid="backup-password"
+            id="backup-password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+            maxLength={256}
+            placeholder="Create a strong password"
+            value={password}
+            disabled={disabled}
+            onInput={(event) => setPassword(event.currentTarget.value)}
+          />
           <button
             type="button"
-            data-testid="backup-done"
-            className="press"
-            onClick={onDone}
-            style={{
-              marginTop: 12,
-              border: 0,
-              background: "transparent",
-              fontWeight: 800,
-            }}
+            data-testid="backup-password-toggle"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            onClick={() => setShowPassword((visible) => !visible)}
+            disabled={disabled}
           >
-            Done
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
-      )}
+        <div className="backup-strength" data-strength={strength}>
+          <div>
+            {[1, 2, 3].map((level) => (
+              <span key={level} data-active={strength >= level} />
+            ))}
+          </div>
+          <strong>
+            {password ? STRENGTH_LABELS[strength] : "8+ characters · mix letters & symbols"}
+          </strong>
+        </div>
+        <div className="backup-privacy-note">
+          <Sparkles size={17} />
+          <span>
+            <strong>Only you know this password.</strong> It never leaves this device and can’t be
+            recovered.
+          </span>
+        </div>
+      </section>
+
+      <button
+        type="submit"
+        data-testid="backup-create"
+        className="backup-primary press"
+        disabled={disabled || strength < 2 || selectedCount === 0}
+      >
+        {disabled ? <span className="backup-spinner" /> : <LockKeyhole size={19} />}
+        {disabled ? "Encrypting your wallet…" : "Create backup file"}
+      </button>
+      <p className="backup-local-caption">
+        <ShieldCheck size={13} /> AES-256 encrypted · created entirely offline
+      </p>
     </form>
   );
 };

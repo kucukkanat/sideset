@@ -346,6 +346,16 @@ describe("honest client-only wallet", () => {
     );
   });
 
+  test("renders home brand assets from stable root URLs", async () => {
+    await mount("#/home");
+
+    const logos = Array.from(document.querySelectorAll<HTMLImageElement>(".home-brand-logo"));
+    expect(logos.map((logo) => logo.getAttribute("src"))).toEqual([
+      "/assets/brand/sideset-logo-light.png",
+      "/assets/brand/sideset-logo-dark.png",
+    ]);
+  });
+
   test("uses contrasting theme colors for the card connect-account icon", async () => {
     await mount("#/cards/c1");
 

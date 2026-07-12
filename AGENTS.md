@@ -1,3 +1,7 @@
+# Constitution
+- Always work on a single branch `main` . Do not use feature branches.
+
+
 # Notifying the user
 
 ## How to use ntfy.sh

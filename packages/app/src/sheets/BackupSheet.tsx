@@ -14,6 +14,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { type FormEvent, type ReactElement, useEffect, useState } from "react";
+import brandMark from "../../assets/brand/sideset-mark.png" with { type: "file" };
 import { CardAvatar } from "../components/CardAvatar.tsx";
 
 export type BackupSaveResult =
@@ -143,7 +144,7 @@ export const BackupSheet = ({
     <form data-testid="backup-sheet" className="backup-flow" onSubmit={submit}>
       <header className="backup-hero">
         <div className="backup-brand-lockup">
-          <img src="./assets/brand/sideset-mark.png" alt="" />
+          <img src={brandMark} alt="" />
           <span>SIDEST</span>
         </div>
         <div className="backup-hero-icon" aria-hidden="true">

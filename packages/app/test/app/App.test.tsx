@@ -1,9 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { App } from "@app/App.tsx";
 import {
+  FEATURE_PREFERENCES_STORAGE_KEY,
+  loadFeaturePreferences,
+  saveFeaturePreferences,
+} from "@app/features/preference-storage.ts";
+import { createCurrentFeaturePreferences } from "@app/features/preferences.ts";
+import { loadToolPreferences } from "@app/features/tool-preference-storage.ts";
+import {
   createInitialWalletState,
   loadWalletState,
+  MAX_COMMITTED_STORAGE_BYTES,
+  PEOPLE_STORAGE_KEY,
   saveWalletState,
+  WALLET_STORAGE_KEY,
   walletSnapshot,
 } from "@app/storage.ts";
 import { createInitialActivity } from "@features/activity/activity.ts";
@@ -65,6 +75,7 @@ const mount = async (hash = "#/wallet"): Promise<void> => {
 beforeEach(() => {
   localStorage.clear();
   saveWalletState(createTestWalletState());
+  saveFeaturePreferences(createCurrentFeaturePreferences("legacy-v1"));
   window.history.replaceState(null, "", "#/wallet");
   document.documentElement.removeAttribute("data-theme");
 });
@@ -374,6 +385,10 @@ describe("honest client-only wallet", () => {
       ["#/settings", "Settings"],
     ] as const) {
       await mount(route);
+      await waitFor(
+        () => document.querySelector(".app-screen-header h1")?.textContent === title,
+        `${title} did not finish loading`,
+      );
       expect(document.querySelector(".app-screen-header h1")?.textContent).toBe(title);
     }
   });
@@ -393,6 +408,7 @@ describe("honest client-only wallet", () => {
       "#/activity",
       "#/tools/cloak",
       "#/settings",
+      "#/settings/features",
       "#/cards/c1",
       "#/people/p1",
       "#/people/p1?sheet=edit",
@@ -416,6 +432,8 @@ describe("honest client-only wallet", () => {
   test("bottom navigation updates the hash route", async () => {
     await mount();
 
+    expect(loadFeaturePreferences("new-install").preferences.initializedFrom).toBe("legacy-v1");
+
     await clickText("People");
     expect(window.location.hash).toBe("#/people");
     expect(maybeByText("People")).toBeDefined();
@@ -432,6 +450,173 @@ describe("honest client-only wallet", () => {
 
     await clickText("Wallet");
     expect(window.location.hash).toBe("#/wallet");
+  });
+
+  test("uses focused defaults when current split storage has no preference document", async () => {
+    localStorage.removeItem(FEATURE_PREFERENCES_STORAGE_KEY);
+
+    await mount();
+
+    expect(maybeByTestId("nav-tools")).toBeUndefined();
+    expect(loadFeaturePreferences("legacy-v1").preferences).toMatchObject({
+      initializedFrom: "new-install",
+      enabled: ["people", "activity"],
+      pinned: ["people"],
+    });
+  });
+
+  test("retains the legacy dock while migrating an actual aggregate v1 document", async () => {
+    localStorage.clear();
+    localStorage.setItem(
+      WALLET_STORAGE_KEY,
+      JSON.stringify(walletSnapshot(createTestWalletState())),
+    );
+
+    await mount();
+
+    expect(maybeByTestId("nav-tools")).toBeDefined();
+    expect(loadFeaturePreferences("new-install").preferences).toMatchObject({
+      initializedFrom: "legacy-v1",
+      enabled: ["people", "activity", "tools"],
+      pinned: ["people", "tools"],
+    });
+  });
+
+  test("keeps enablement separate from configurable dock placement", async () => {
+    expect(saveFeaturePreferences(createCurrentFeaturePreferences("new-install"))).toEqual({
+      ok: true,
+    });
+    await mount("#/settings");
+
+    expect(maybeByTestId("nav-wallet")).toBeDefined();
+    expect(maybeByTestId("nav-people")).toBeDefined();
+    expect(maybeByTestId("nav-tools")).toBeUndefined();
+    expect(maybeByTestId("nav-settings")).toBeDefined();
+
+    await click(byTestId("settings-features"));
+    expect(window.location.hash).toBe("#/settings/features");
+    expect(byTestId("features-dock-preview").textContent).toBe("WalletPeopleSettings");
+    expect(byTestId("feature-tools-toggle").textContent).toContain("Turn on");
+
+    await click(byTestId("feature-tools-toggle"));
+    await waitFor(
+      () => byTestId("feature-tools-toggle").textContent?.includes("Turn off") === true,
+      "Tools did not become enabled",
+    );
+    await waitFor(
+      () => document.activeElement === byTestId("feature-tools-toggle"),
+      "Feature toggle focus was not restored",
+    );
+    expect(byTestId("feature-tools").textContent).toContain("Online only in this browser");
+    expect(maybeByTestId("nav-tools")).toBeUndefined();
+
+    await click(byTestId("feature-tools-dock"));
+    expect(maybeByTestId("nav-tools")).toBeDefined();
+    expect(byTestId("features-dock-preview").textContent).toBe("WalletPeopleToolsSettings");
+
+    await click(byTestId("feature-tools-earlier"));
+    expect(byTestId("features-dock-preview").textContent).toBe("WalletToolsPeopleSettings");
+
+    await click(byTestId("feature-tools-dock"));
+    expect(maybeByTestId("nav-tools")).toBeUndefined();
+    expect(byTestId("feature-tools-toggle").textContent).toContain("Turn off");
+
+    await click(byTestId("feature-tools-toggle"));
+    expect(byTestId("feature-tools-toggle").textContent).toContain("Turn on");
+    const stored = loadFeaturePreferences("legacy-v1");
+    expect(stored.ok).toBe(true);
+    expect(stored.preferences.enabled).not.toContain("tools");
+    expect(stored.preferences.pinned).not.toContain("tools");
+  });
+
+  test("offers an explicit enable action for a disabled feature deep link", async () => {
+    expect(saveFeaturePreferences(createCurrentFeaturePreferences("new-install"))).toEqual({
+      ok: true,
+    });
+
+    await mount("#/tools/decrypt");
+    expect(window.location.hash).toBe("#/tools/decrypt");
+    expect(maybeByTestId("screen-disabled-feature")).toBeDefined();
+    expect(maybeByTestId("screen-tools")).toBeUndefined();
+
+    const enable = byTestId("disabled-feature-enable") as HTMLButtonElement;
+    act(() => {
+      enable.click();
+    });
+    expect(enable.disabled).toBe(true);
+    expect(enable.getAttribute("aria-busy")).toBe("true");
+    expect(maybeByText("Downloading Tools…")).toBeDefined();
+    await act(async () => {
+      enable.click();
+      await tick();
+    });
+    await waitFor(() => maybeByTestId("screen-tools") !== undefined, "Tools did not load");
+    const toolsHeading = byTestId("screen-tools").querySelector("h1");
+    await waitFor(
+      () => document.activeElement === toolsHeading,
+      "Enabled feature heading did not receive focus",
+    );
+
+    expect(window.location.hash).toBe("#/tools/decrypt");
+    expect(document.title).toBe("Tools · Keychain");
+    expect(maybeByTestId("nav-tools")).toBeUndefined();
+    const enabled = loadFeaturePreferences("new-install").preferences.enabled;
+    expect(enabled).toContain("tools");
+    expect(enabled.filter((id) => id === "tools")).toHaveLength(1);
+  });
+
+  test("toggles each nested tool independently and guards its deep link", async () => {
+    await mount("#/settings/features");
+    expect(byTestId("feature-tools-cloak-toggle").textContent).toContain("Turn off");
+
+    await click(byTestId("feature-tools-cloak-toggle"));
+    expect(byTestId("feature-tools-cloak-toggle").textContent).toContain("Turn on");
+    expect(loadToolPreferences().preferences.enabled).not.toContain("cloak");
+    expect(loadToolPreferences().preferences.enabled).toContain("encrypt");
+
+    await mount("#/tools/cloak");
+    await waitFor(
+      () => maybeByTestId("screen-disabled-feature") !== undefined,
+      "Disabled Cloak deep link was not guarded",
+    );
+    expect(maybeByTestId("screen-tools")).toBeUndefined();
+    expect(byTestId("screen-disabled-feature").textContent).toContain("Cloak");
+
+    await click(byTestId("disabled-feature-enable"));
+    await waitFor(() => maybeByTestId("screen-tools") !== undefined, "Cloak did not turn on");
+    expect(loadToolPreferences().preferences.enabled).toContain("cloak");
+  });
+
+  test("focuses an enabled migrated feature after readiness replaces its loading screen", async () => {
+    await mount("#/tools/encrypt");
+    await waitFor(() => maybeByTestId("screen-tools") !== undefined, "Tools did not become ready");
+
+    const heading = byTestId("screen-tools").querySelector("h1");
+    expect(document.activeElement).toBe(heading);
+    expect(document.title).toBe("Tools · Keychain");
+  });
+
+  test("retains Activity data but stops recording while Activity is off", async () => {
+    const initialActivity = loadWalletState().state.activity;
+    const next = SEED_CARDS[1];
+    if (next === undefined) throw new Error("Expected another seeded card");
+    await mount("#/settings/features");
+
+    await click(byTestId("feature-activity-toggle"));
+    expect(byTestId("feature-activity-toggle").textContent).toContain("Turn on");
+    await click(byTestId("nav-wallet"));
+    await click(byTestId(`home-card-indicator-${next.id}`));
+
+    expect(loadWalletState().state.activity).toEqual(initialActivity);
+    expect(maybeByTestId("home-recent-activity")).toBeUndefined();
+    await mount("#/settings");
+    expect(maybeByTestId("settings-activity")).toBeUndefined();
+    await mount("#/activity");
+    expect(maybeByTestId("screen-disabled-feature")).toBeDefined();
+
+    await click(byTestId("disabled-feature-enable"));
+    expect(maybeByTestId("screen-activity")).toBeDefined();
+    expect(loadWalletState().state.activity).toEqual(initialActivity);
   });
 
   test("activates whichever card moves to the front of the carousel", async () => {
@@ -536,6 +721,75 @@ describe("honest client-only wallet", () => {
     await type(input, "Everyday");
     await click(byTestId("tools-recipient-option-card-c1"));
     expect(input.value).toBe(nip19.npubEncode(cardPublicKey));
+  });
+
+  test("retains People data without contributing contacts while People is off", async () => {
+    const initial = createTestWalletState();
+    const firstCard = initial.cards[0];
+    const firstContact = initial.contacts[0];
+    if (firstCard === undefined || firstContact === undefined) {
+      throw new Error("Expected seeded recipients");
+    }
+    const cardPublicKey = "a".repeat(64);
+    const contactPublicKey = "b".repeat(64);
+    saveWalletState({
+      ...initial,
+      cards: [
+        {
+          ...firstCard,
+          identity: { publicKey: cardPublicKey, privateKey: "c".repeat(64) },
+        },
+        ...initial.cards.slice(1),
+      ],
+      contacts: [{ ...firstContact, npub: contactPublicKey }, ...initial.contacts.slice(1)],
+    });
+    const preferences = createCurrentFeaturePreferences("legacy-v1");
+    expect(
+      saveFeaturePreferences({
+        ...preferences,
+        enabled: preferences.enabled.filter((id) => id !== "people"),
+        pinned: preferences.pinned.filter((id) => id !== "people"),
+      }),
+    ).toEqual({ ok: true });
+
+    await mount("#/tools/encrypt");
+    const input = byTestId("tools-recipient") as HTMLInputElement;
+    await act(async () => input.focus());
+    await type(input, "aria");
+    expect(maybeByTestId("tools-recipient-option-contact-p1")).toBeUndefined();
+
+    await type(input, "Everyday");
+    expect(maybeByTestId("tools-recipient-option-card-c1")).toBeDefined();
+    expect(loadWalletState().state.contacts).toHaveLength(initial.contacts.length);
+  });
+
+  test("isolates unavailable People data without overwriting its stored bytes", async () => {
+    const protectedBytes = '{"version":2,"feature":"people","future":true}';
+    localStorage.setItem(PEOPLE_STORAGE_KEY, protectedBytes);
+
+    await mount("#/people");
+
+    expect(maybeByText("People data is unavailable")).toBeDefined();
+    expect(localStorage.getItem(PEOPLE_STORAGE_KEY)).toBe(protectedBytes);
+    expect(loadWalletState()).toMatchObject({
+      ok: true,
+      unavailableFeatures: ["people"],
+      state: { cards: SEED_CARDS, contacts: [] },
+    });
+
+    await mount("#/wallet");
+    expect(maybeByText("Everyday")).toBeDefined();
+
+    await mount("#/settings/features");
+    expect((byTestId("feature-people-open") as HTMLButtonElement).disabled).toBe(true);
+    expect(bodyText()).toContain("Saved data unavailable; original data preserved");
+    expect(localStorage.getItem(PEOPLE_STORAGE_KEY)).toBe(protectedBytes);
+
+    await click(byTestId("feature-people-toggle"));
+    await mount("#/people");
+    expect(maybeByText("People data is unavailable")).toBeDefined();
+    expect(maybeByTestId("disabled-feature-enable")).toBeUndefined();
+    expect(localStorage.getItem(PEOPLE_STORAGE_KEY)).toBe(protectedBytes);
   });
 
   test("cloaks, copies, and reveals a password-protected message", async () => {
@@ -776,6 +1030,48 @@ describe("honest client-only wallet", () => {
     expect(maybeByText("@finnriver")).toBeDefined();
   });
 
+  test("deletes an identity after confirmation and activates a remaining identity", async () => {
+    await mount("#/cards/c1");
+
+    await click(byTestId("card-detail-delete"));
+    expect(maybeByTestId("delete-identity-dialog")).toBeDefined();
+    expect(maybeByText("Delete Everyday?")).toBeDefined();
+    expect(maybeByTestId("bottom-navigation")).toBeUndefined();
+
+    await click(byTestId("delete-identity-cancel"));
+    expect(maybeByTestId("delete-identity-dialog")).toBeUndefined();
+    expect(loadWalletState().state.cards.some(({ id }) => id === "c1")).toBe(true);
+
+    await click(byTestId("card-detail-delete"));
+    await click(byTestId("delete-identity-confirm"));
+
+    const saved = loadWalletState().state;
+    expect(window.location.hash).toBe("#/wallet");
+    expect(saved.cards.some(({ id }) => id === "c1")).toBe(false);
+    expect(saved.activeId).toBe("c2");
+    expect(maybeByText("Everyday deleted")).toBeDefined();
+
+    await mount();
+    expect(maybeByTestId("home-card-c1")).toBeUndefined();
+    expect(byTestId("home-card-c2").textContent).toContain("ACTIVE");
+  });
+
+  test("returns to identity creation after deleting the final identity", async () => {
+    const state = createTestWalletState();
+    const only = state.cards[0];
+    if (only === undefined) throw new Error("Expected a seeded card");
+    saveWalletState({ ...state, cards: [only], activeId: only.id });
+    await mount(`#/cards/${only.id}`);
+
+    await click(byTestId("card-detail-delete"));
+    await click(byTestId("delete-identity-confirm"));
+
+    expect(loadWalletState().state.cards).toEqual([]);
+    expect(loadWalletState().state.activeId).toBe("");
+    expect(window.location.hash).toBe("#/wallet");
+    expect(maybeByText("Create a card")).toBeDefined();
+  });
+
   test("uploads a profile picture while editing a card", async () => {
     await mount("#/cards/c1");
     await click(buttonByLabel("Edit Everyday"));
@@ -834,7 +1130,7 @@ describe("honest client-only wallet", () => {
     expect(maybeByText("Gaming")).toBeDefined();
   });
 
-  test("opens the local account connector while keeping settings capabilities honest", async () => {
+  test("keeps settings limited to shipped capabilities", async () => {
     await mount();
 
     const connectButtons = Array.from(
@@ -849,13 +1145,11 @@ describe("honest client-only wallet", () => {
     expect(window.location.hash).toBe("#/wallet");
 
     await clickText("Settings");
-    for (const label of ["Approve with Face ID", "Sync with iCloud", "Notifications"] as const) {
-      const button = buttonContaining(label);
-      expect(button.disabled).toBe(true);
-      expect(button.textContent).toContain("Coming soon");
-      await click(button);
-      expect(window.location.hash).toBe("#/settings");
-    }
+    expect(maybeByText("Approve with Face ID")).toBeUndefined();
+    expect(maybeByText("Sync with iCloud")).toBeUndefined();
+    expect(maybeByText("Notifications")).toBeUndefined();
+    expect(bodyText()).not.toContain("Coming soon");
+    expect(maybeByTestId("settings-features")).toBeDefined();
   });
 
   test("persists and applies the selected appearance", async () => {
@@ -876,6 +1170,41 @@ describe("honest client-only wallet", () => {
     await mount("#/settings");
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(maybeByText("Dark")).toBeDefined();
+  });
+
+  test("rejects an over-budget mutation before changing session state", async () => {
+    localStorage.clear();
+    const initial = createTestWalletState();
+    const firstCard = initial.cards[0];
+    if (firstCard === undefined) throw new Error("Test wallet needs a card");
+    localStorage.setItem(
+      WALLET_STORAGE_KEY,
+      JSON.stringify(
+        walletSnapshot({
+          ...initial,
+          cards: [
+            {
+              ...firstCard,
+              avatar: `data:image/png;base64,${"A".repeat(MAX_COMMITTED_STORAGE_BYTES)}`,
+            },
+            ...initial.cards.slice(1),
+          ],
+        }),
+      ),
+    );
+    await mount("#/settings?sheet=appearance");
+
+    const light = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("button[role='radio']"),
+    ).find((button) => button.textContent?.includes("Light"));
+    if (light === undefined) throw new Error("Missing light appearance option");
+    await click(light);
+
+    expect(
+      maybeByText("This change would exceed this device’s safe local storage budget."),
+    ).toBeDefined();
+    expect(light.getAttribute("aria-checked")).toBe("false");
+    expect(loadWalletState().state.theme).toBe("system");
   });
 
   test("renders direct contact routes with profile and key management", async () => {
@@ -1441,6 +1770,7 @@ describe("honest client-only wallet", () => {
   });
 
   test("does not overwrite state created by a newer app schema", async () => {
+    localStorage.removeItem(FEATURE_PREFERENCES_STORAGE_KEY);
     const newerState = JSON.stringify({ version: 2, opaque: "keep-me" });
     localStorage.setItem("keychain.wallet.v1", newerState);
 
@@ -1448,5 +1778,23 @@ describe("honest client-only wallet", () => {
 
     expect(localStorage.getItem("keychain.wallet.v1")).toBe(newerState);
     expect(maybeByText("Saved data needs a newer app; changes won’t be saved")).toBeDefined();
+    expect(loadFeaturePreferences("legacy-v1").preferences).toMatchObject({
+      initializedFrom: "new-install",
+      enabled: ["people", "activity"],
+      pinned: ["people"],
+    });
+  });
+
+  test("does not apply legacy feature defaults to a corrupt wallet snapshot", async () => {
+    localStorage.removeItem(FEATURE_PREFERENCES_STORAGE_KEY);
+    localStorage.setItem("keychain.wallet.v1", "{broken");
+
+    await mount();
+
+    expect(loadFeaturePreferences("legacy-v1").preferences).toMatchObject({
+      initializedFrom: "new-install",
+      enabled: ["people", "activity"],
+      pinned: ["people"],
+    });
   });
 });

@@ -48,6 +48,8 @@ export const formatHashRoute = (route: Route): string => {
       return "#/activity";
     case "tools":
       return `#/tools/${route.operation}`;
+    case "features":
+      return "#/settings/features";
     case "settings": {
       const params = new URLSearchParams();
       if (route.sheet !== undefined) params.set("sheet", route.sheet);
@@ -70,6 +72,7 @@ export const routeWithoutOverlay = (route: Route): Route | null => {
     case "person":
       return route.sheet === undefined ? null : { page: "person", contactId: route.contactId };
     case "activity":
+    case "features":
     case "tools":
       return null;
   }

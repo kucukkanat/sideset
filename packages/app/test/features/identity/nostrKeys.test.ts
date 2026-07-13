@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import {
-  nostrDisplayKeys,
-  nostrPublicKey,
-  nostrPublicKeyHex,
-} from "@features/identity/nostrKeys.ts";
 import { generateNostrIdentity } from "@features/tools/tools.ts";
+import { nostrDisplayKeys, nostrPublicKey, nostrPublicKeyHex } from "@shared/lib/nostrKeys.ts";
 import { nip19 } from "nostr-tools";
 
 const hex = (bytes: Uint8Array): string =>

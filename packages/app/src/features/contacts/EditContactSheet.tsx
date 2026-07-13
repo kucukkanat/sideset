@@ -1,5 +1,5 @@
-import { nostrPublicKey } from "@features/identity/nostrKeys.ts";
 import { type Contact, type ContactChanges, EMOJI_CHOICES, paletteFor } from "@keychain/core";
+import { nostrPublicKey } from "@shared/lib/nostrKeys.ts";
 import { type FormEvent, type ReactElement, useState } from "react";
 
 export type EditContactResult =

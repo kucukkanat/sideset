@@ -1,6 +1,6 @@
 import { CardAvatar } from "@features/cards/CardAvatar.tsx";
-import { nostrPublicKey } from "@features/identity/nostrKeys.ts";
 import { type Contact, PROVIDER_META, paletteFor, proofVerificationUrl } from "@keychain/core";
+import { nostrPublicKey } from "@shared/lib/nostrKeys.ts";
 import {
   BackIcon,
   CopyIcon,

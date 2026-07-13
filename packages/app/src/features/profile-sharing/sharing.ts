@@ -1,3 +1,5 @@
+import { copyText } from "@shared/lib/clipboard.ts";
+
 export type ShareResult =
   | { readonly ok: true; readonly method: "share" | "clipboard" }
   | { readonly ok: false; readonly reason: "cancelled" | "unavailable" | "failed" };
@@ -8,34 +10,6 @@ export const profileShareUrl = (pageUrl: string, profile: string): string => {
   const query = new URLSearchParams({ sheet: "add", profile });
   url.hash = `/people?${query.toString()}`;
   return url.toString();
-};
-
-export const copyText = async (value: string): Promise<ShareResult> => {
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(value);
-      return { ok: true, method: "clipboard" };
-    } catch {
-      // Some embedded browsers expose the API but deny it; the local fallback still works.
-    }
-  }
-
-  const field = document.createElement("textarea");
-  field.value = value;
-  field.readOnly = true;
-  field.style.position = "fixed";
-  field.style.opacity = "0";
-  document.body.appendChild(field);
-  field.select();
-  try {
-    return document.execCommand("copy")
-      ? { ok: true, method: "clipboard" }
-      : { ok: false, reason: "unavailable" };
-  } catch {
-    return { ok: false, reason: "failed" };
-  } finally {
-    field.remove();
-  }
 };
 
 const isAbort = (error: unknown): boolean =>

@@ -1,6 +1,5 @@
-import { CardAvatar } from "@features/cards/CardAvatar.tsx";
-import { nostrDisplayKeys } from "@features/identity/nostrKeys.ts";
 import { type Card, PROVIDER_META, type ProviderId, paletteFor } from "@keychain/core";
+import { nostrDisplayKeys } from "@shared/lib/nostrKeys.ts";
 import {
   BackIcon,
   CopyIcon,
@@ -11,7 +10,9 @@ import {
   ProviderIcon,
   ShareIcon,
   ShieldIcon,
+  TrashIcon,
 } from "@shared/ui/icons.tsx";
+import { Trash2 } from "lucide-react";
 import {
   type KeyboardEvent,
   type ReactElement,
@@ -20,6 +21,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { CardAvatar } from "./CardAvatar.tsx";
 
 interface CardDetailProps {
   card: Card;
@@ -35,6 +37,8 @@ interface CardDetailProps {
   onCopyPrivateKey: (privateKey: string) => void;
   onDisconnectAccount: (provider: ProviderId) => void;
   onConnectAccount: () => void;
+  onDelete: () => void;
+  onRemovalDialogChange: (open: boolean) => void;
 }
 
 export const CardDetail = ({
@@ -50,6 +54,8 @@ export const CardDetail = ({
   onCopyPrivateKey,
   onDisconnectAccount,
   onConnectAccount,
+  onDelete,
+  onRemovalDialogChange,
 }: CardDetailProps): ReactElement => {
   const pal = paletteFor(card.color);
   const identity = card.identity;
@@ -57,8 +63,11 @@ export const CardDetail = ({
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [isHoldingVault, setIsHoldingVault] = useState(false);
   const [isCopyArmed, setIsCopyArmed] = useState(false);
+  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const sealTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
+  const cancelRemovalButtonRef = useRef<HTMLButtonElement | null>(null);
   const cancelHold = (): void => {
     clearTimeout(holdTimer.current);
     setIsHoldingVault(false);
@@ -90,6 +99,27 @@ export const CardDetail = ({
     },
     [],
   );
+  useEffect(() => {
+    if (!confirmingRemoval) return;
+    requestAnimationFrame(() => cancelRemovalButtonRef.current?.focus());
+    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setConfirmingRemoval(false);
+      requestAnimationFrame(() => deleteButtonRef.current?.focus());
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmingRemoval]);
+  useEffect(() => {
+    onRemovalDialogChange(confirmingRemoval);
+  }, [confirmingRemoval, onRemovalDialogChange]);
+  useEffect(() => () => onRemovalDialogChange(false), [onRemovalDialogChange]);
+
+  const cancelRemoval = (): void => {
+    setConfirmingRemoval(false);
+    requestAnimationFrame(() => deleteButtonRef.current?.focus());
+  };
   return (
     <div
       data-testid={`screen-card-detail-${card.id}`}
@@ -99,6 +129,8 @@ export const CardDetail = ({
       <div
         ref={heroRef}
         className="detail-hero"
+        aria-hidden={confirmingRemoval || undefined}
+        inert={confirmingRemoval || undefined}
         style={{
           background: pal.grad,
           opacity: heroHidden ? 0 : 1,
@@ -136,7 +168,12 @@ export const CardDetail = ({
         </div>
       </div>
 
-      <div data-testid="card-detail-profile" className="detail-section">
+      <div
+        data-testid="card-detail-profile"
+        className="detail-section"
+        aria-hidden={confirmingRemoval || undefined}
+        inert={confirmingRemoval || undefined}
+      >
         <div className="detail-section-heading">Profile</div>
         <div className="panel">
           <div className="row">
@@ -156,7 +193,11 @@ export const CardDetail = ({
         </div>
       </div>
 
-      <div className="detail-control-section">
+      <div
+        className="detail-control-section"
+        aria-hidden={confirmingRemoval || undefined}
+        inert={confirmingRemoval || undefined}
+      >
         {isActive ? (
           <div data-testid="card-detail-activate" className="detail-active-state">
             <span
@@ -187,10 +228,14 @@ export const CardDetail = ({
         )}
       </div>
 
-      <div className="detail-control-section detail-action-grid">
-        <div
+      <div
+        className="detail-control-section detail-action-grid"
+        aria-hidden={confirmingRemoval || undefined}
+        inert={confirmingRemoval || undefined}
+      >
+        <button
           data-testid="card-detail-share"
-          role="button"
+          type="button"
           className="action-tile press"
           onClick={onShare}
         >
@@ -198,10 +243,15 @@ export const CardDetail = ({
             <ShareIcon />
           </div>
           <div className="lbl">Share</div>
-        </div>
+        </button>
       </div>
 
-      <div data-testid="card-detail-accounts" className="detail-section">
+      <div
+        data-testid="card-detail-accounts"
+        className="detail-section"
+        aria-hidden={confirmingRemoval || undefined}
+        inert={confirmingRemoval || undefined}
+      >
         <div className="detail-section-heading">Connected accounts</div>
         <div className="panel">
           {(card.proofs ?? []).map((proof) => {
@@ -273,7 +323,12 @@ export const CardDetail = ({
       </div>
 
       {displayKeys !== undefined && (
-        <section data-testid="card-detail-keys" className="card-keys">
+        <section
+          data-testid="card-detail-keys"
+          className="card-keys"
+          aria-hidden={confirmingRemoval || undefined}
+          inert={confirmingRemoval || undefined}
+        >
           <div className="card-keys-heading">
             <div>
               <div className="card-keys-title">Keys</div>
@@ -407,6 +462,66 @@ export const CardDetail = ({
             )}
           </div>
         </section>
+      )}
+
+      <div
+        className="detail-control-section identity-delete-section"
+        aria-hidden={confirmingRemoval || undefined}
+        inert={confirmingRemoval || undefined}
+      >
+        <button
+          ref={deleteButtonRef}
+          data-testid="card-detail-delete"
+          type="button"
+          className="action-tile identity-detail-delete-action press"
+          onClick={() => setConfirmingRemoval(true)}
+        >
+          <div className="ico" aria-hidden="true">
+            <TrashIcon />
+          </div>
+          <div className="lbl">Delete identity</div>
+        </button>
+      </div>
+
+      {confirmingRemoval && (
+        <div className="contact-dialog-layer">
+          <div
+            data-testid="delete-identity-dialog"
+            className="contact-confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-identity-title"
+            aria-describedby="delete-identity-description"
+          >
+            <div className="contact-confirm-icon">
+              <Trash2 aria-hidden="true" size={38} />
+            </div>
+            <h2 id="delete-identity-title">Delete {card.name}?</h2>
+            <p id="delete-identity-description">
+              This permanently deletes the identity and its private key from this device. Back it up
+              first if you may need it again.
+            </p>
+            <div className="contact-confirm-actions">
+              <button
+                ref={cancelRemovalButtonRef}
+                data-testid="delete-identity-cancel"
+                type="button"
+                className="btn-light press"
+                onClick={cancelRemoval}
+              >
+                Cancel
+              </button>
+              <button
+                data-testid="delete-identity-confirm"
+                type="button"
+                className="contact-confirm-remove press"
+                onClick={onDelete}
+              >
+                Delete identity
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

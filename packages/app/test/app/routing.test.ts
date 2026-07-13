@@ -52,6 +52,7 @@ const CASES: readonly { readonly route: Route; readonly hash: string }[] = [
   { route: { page: "tools", operation: "sign" }, hash: "#/tools/sign" },
   { route: { page: "tools", operation: "verify" }, hash: "#/tools/verify" },
   { route: { page: "tools", operation: "cloak" }, hash: "#/tools/cloak" },
+  { route: { page: "features" }, hash: "#/settings/features" },
   { route: { page: "settings" }, hash: "#/settings" },
   { route: { page: "settings", sheet: "restore" }, hash: "#/settings?sheet=restore" },
 ];
@@ -132,6 +133,7 @@ describe("hash route parsing and formatting", () => {
     });
     expect(routeWithoutOverlay({ page: "activity" })).toBeNull();
     expect(routeWithoutOverlay({ page: "tools", operation: "encrypt" })).toBeNull();
+    expect(routeWithoutOverlay({ page: "features" })).toBeNull();
   });
 });
 

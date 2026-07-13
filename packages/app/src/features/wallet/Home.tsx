@@ -1,5 +1,3 @@
-import { ActivityRow } from "@features/activity/ActivityRow.tsx";
-import type { ActivityItem } from "@features/activity/activity.ts";
 import { CardAvatar } from "@features/cards/CardAvatar.tsx";
 import { CardFace } from "@features/cards/CardFace.tsx";
 import {
@@ -20,6 +18,7 @@ import { ArrowRight, Search, X } from "lucide-react";
 import {
   type MutableRefObject,
   type ReactElement,
+  type ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -42,9 +41,8 @@ interface HomeProps {
   onOpenDetail: (id: string, el: HTMLElement | null) => void;
   onCreate: () => void;
   onConnectAccount: () => void;
-  onSeeActivity: () => void;
   onAccountTap: (account: Proof) => void;
-  recentActivity: readonly ActivityItem[];
+  secondary?: ReactNode;
 }
 
 export const Home = ({
@@ -59,9 +57,8 @@ export const Home = ({
   onOpenDetail,
   onCreate,
   onConnectAccount,
-  onSeeActivity,
   onAccountTap,
-  recentActivity,
+  secondary,
 }: HomeProps): ReactElement => {
   const [drag, setDrag] = useState({ x: 0, dragging: false });
   const [searchOpen, setSearchOpen] = useState(false);
@@ -337,26 +334,7 @@ export const Home = ({
           </div>
         </section>
 
-        <section data-testid="home-recent-activity" className="wallet-section wallet-recent">
-          <div className="wallet-section-heading">
-            <div>
-              <h2>Recent activity</h2>
-              <p>Your latest wallet changes</p>
-            </div>
-            <button type="button" data-testid="home-see-all-activity" onClick={onSeeActivity}>
-              See all
-            </button>
-          </div>
-          <div className="panel">
-            {recentActivity.length > 0 ? (
-              recentActivity.map((item) => <ActivityRow key={item.id} item={item} />)
-            ) : (
-              <div className="row-sub wallet-empty-activity">
-                Your latest changes will appear here.
-              </div>
-            )}
-          </div>
-        </section>
+        {secondary}
       </main>
     </div>
   );

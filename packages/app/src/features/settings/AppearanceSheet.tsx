@@ -1,6 +1,6 @@
-import type { ThemePreference } from "@features/settings/Settings.tsx";
 import { type LucideIcon, MonitorCog, Moon, Sun } from "lucide-react";
 import type { ReactElement } from "react";
+import type { ThemePreference } from "./Settings.tsx";
 
 const OPTIONS: readonly {
   readonly value: ThemePreference;

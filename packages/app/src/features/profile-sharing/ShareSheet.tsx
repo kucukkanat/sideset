@@ -1,7 +1,8 @@
-import { copyText, shareProfile } from "@features/profile-sharing/sharing.ts";
 import { type Card, type Contact, paletteFor } from "@keychain/core";
+import { copyText } from "@shared/lib/clipboard.ts";
 import { QrCode } from "@shared/ui/QrCode.tsx";
 import { type ReactElement, useEffect, useRef, useState } from "react";
+import { shareProfile } from "./sharing.ts";
 
 export const ShareSheet = ({
   subject,

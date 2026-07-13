@@ -1,5 +1,13 @@
 import { App } from "@app/App.tsx";
+import { installServiceWorkerBuildVersionResponder } from "@app/features/acquisition.ts";
+import { loadFeaturePreferences } from "@app/features/preference-storage.ts";
+import { walletPreferenceInitialization } from "@app/storage.ts";
 import { createRoot } from "react-dom/client";
+
+const preferenceInitialization = walletPreferenceInitialization();
+installServiceWorkerBuildVersionResponder(
+  () => loadFeaturePreferences(preferenceInitialization).preferences.enabled,
+);
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root element");

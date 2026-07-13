@@ -1,7 +1,7 @@
-import type { BackupSelection } from "@features/backup/BackupSheet.tsx";
-import { MAX_BACKUP_BYTES } from "@features/backup/backup.ts";
 import { CheckIcon, ShieldIcon } from "@shared/ui/icons.tsx";
 import { type FormEvent, type ReactElement, useState } from "react";
+import type { BackupSelection } from "./BackupSheet.tsx";
+import { MAX_BACKUP_BYTES } from "./backup.ts";
 
 export type RestoreResult =
   | { readonly ok: true }

@@ -1,6 +1,7 @@
 export {
   addProof,
   createCard,
+  removeCards,
   removeProof,
   searchCards,
   updateCard,

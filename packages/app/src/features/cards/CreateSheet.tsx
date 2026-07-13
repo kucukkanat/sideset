@@ -1,4 +1,3 @@
-import { CardAvatar } from "@features/cards/CardAvatar.tsx";
 import {
   generateIdentityKeyPair,
   identityFromPrivateKey,
@@ -8,6 +7,7 @@ import { readAvatarFile } from "@shared/lib/avatar.ts";
 import { CheckIcon } from "@shared/ui/icons.tsx";
 import { Eye, EyeOff, KeyRound, RefreshCw, Upload } from "lucide-react";
 import { type FormEvent, type ReactElement, useEffect, useRef, useState } from "react";
+import { CardAvatar } from "./CardAvatar.tsx";
 
 type Step = "form" | "gen" | "done";
 

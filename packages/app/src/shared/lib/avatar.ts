@@ -1,6 +1,9 @@
-export const MAX_AVATAR_BYTES = 4_000_000;
+export const MAX_AVATAR_BYTES = 500_000;
 
-const MAX_DATA_URL_CHARS = 23 + 4 * Math.ceil(MAX_AVATAR_BYTES / 3);
+// Decoder compatibility is intentionally wider than admission control so an older large avatar
+// can still be opened, removed, and exported after the upload limit is tightened.
+const MAX_STORED_AVATAR_BYTES = 4_000_000;
+const MAX_DATA_URL_CHARS = 23 + 4 * Math.ceil(MAX_STORED_AVATAR_BYTES / 3);
 const DATA_URL = /^data:image\/(?:gif|jpeg|png|webp);base64,[A-Za-z0-9+/]*={0,2}$/u;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
@@ -17,7 +20,7 @@ export const readAvatarFile = async (file: File): Promise<AvatarFileResult> => {
     return { ok: false, message: "Choose a JPEG, PNG, WebP, or GIF image" };
   }
   if (file.size > MAX_AVATAR_BYTES) {
-    return { ok: false, message: "Choose an image no larger than 4 MB" };
+    return { ok: false, message: "Choose an image no larger than 500 KB" };
   }
   return await new Promise((resolve) => {
     const reader = new FileReader();

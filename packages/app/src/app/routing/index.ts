@@ -3,6 +3,7 @@ import { DEFAULT_ROUTE, type Route } from "@app/routing/model.ts";
 import type { RouteDefinition } from "@app/routing/route-definition.ts";
 import { activityRoute } from "@app/routing/routes/activity.route.ts";
 import { cardRoute } from "@app/routing/routes/card.route.ts";
+import { featuresRoute } from "@app/routing/routes/features.route.ts";
 import { peopleRoute } from "@app/routing/routes/people.route.ts";
 import { personRoute } from "@app/routing/routes/person.route.ts";
 import { settingsRoute } from "@app/routing/routes/settings.route.ts";
@@ -20,6 +21,7 @@ const definitions: readonly RouteDefinition[] = [
   activityRoute,
   toolsIndexRoute,
   toolRoute,
+  featuresRoute,
   settingsRoute,
 ];
 

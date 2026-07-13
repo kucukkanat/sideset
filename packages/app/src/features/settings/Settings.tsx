@@ -1,17 +1,13 @@
 import { CardAvatar } from "@features/cards/CardAvatar.tsx";
 import { type Card, paletteFor } from "@keychain/core";
-import { ComingSoon } from "@shared/ui/ComingSoon.tsx";
 import { ChevronIcon } from "@shared/ui/icons.tsx";
 import { ScreenHeader } from "@shared/ui/ScreenHeader.tsx";
 import {
-  Bell,
   CircleHelp,
-  Cloud,
   Download,
-  History,
+  LayoutGrid,
   type LucideIcon,
   Palette,
-  ScanFace,
   ShieldCheck,
   Trash2,
 } from "lucide-react";
@@ -23,12 +19,12 @@ interface SettingsProps {
   active: Card;
   theme: ThemePreference;
   onOpenActiveCard: () => void;
+  onFeatures: () => void;
   onAppearance: () => void;
   onBackup: () => void;
   onRestore: () => void;
   onHelp: () => void;
   onReset: () => void;
-  onActivity: () => void;
 }
 
 interface RowBase {
@@ -38,11 +34,7 @@ interface RowBase {
   readonly label: string;
 }
 
-type RowDef = RowBase &
-  (
-    | { readonly disabled: true }
-    | { readonly disabled?: false; readonly detail?: string; readonly onTap: () => void }
-  );
+type RowDef = RowBase & { readonly detail?: string; readonly onTap: () => void };
 
 const themeLabel = (theme: ThemePreference): string => {
   switch (theme) {
@@ -59,25 +51,18 @@ export const Settings = ({
   active,
   theme,
   onOpenActiveCard,
+  onFeatures,
   onAppearance,
   onBackup,
   onRestore,
   onHelp,
   onReset,
-  onActivity,
 }: SettingsProps): ReactElement => {
   const pal = paletteFor(active.color);
   const groups: readonly { readonly title: string; readonly rows: readonly RowDef[] }[] = [
     {
       title: "Security",
       rows: [
-        {
-          icon: ScanFace,
-          bg: "#EAF0FF",
-          fg: "#244BB5",
-          label: "Approve with Face ID",
-          disabled: true,
-        },
         {
           icon: ShieldCheck,
           bg: "#E9F7EC",
@@ -96,26 +81,14 @@ export const Settings = ({
       ],
     },
     {
-      title: "Cloud",
-      rows: [
-        {
-          icon: Cloud,
-          bg: "#E8F0FF",
-          fg: "#244BB5",
-          label: "Sync with iCloud",
-          disabled: true,
-        },
-      ],
-    },
-    {
       title: "Preferences",
       rows: [
         {
-          icon: Bell,
-          bg: "#FFF6DB",
-          fg: "#805400",
-          label: "Notifications",
-          disabled: true,
+          icon: LayoutGrid,
+          bg: "#E8F0FF",
+          fg: "#244BB5",
+          label: "Features",
+          onTap: onFeatures,
         },
         {
           icon: Palette,
@@ -137,13 +110,6 @@ export const Settings = ({
     {
       title: "Application",
       rows: [
-        {
-          icon: History,
-          bg: "#EFEAF7",
-          fg: "#67409B",
-          label: "Activity",
-          onTap: onActivity,
-        },
         {
           icon: Trash2,
           bg: "#FDECE7",
@@ -205,17 +171,14 @@ export const Settings = ({
           </div>
           <div data-testid={`settings-group-${group.title.toLowerCase()}-list`} className="panel">
             {group.rows.map((row) => {
-              const disabled = row.disabled === true;
               const Icon = row.icon;
               return (
                 <button
                   type="button"
                   key={row.label}
                   data-testid={`settings-${row.label.toLowerCase().replaceAll(" ", "-")}`}
-                  className={disabled ? "row row-disabled" : "row press"}
-                  disabled={disabled}
-                  aria-disabled={disabled}
-                  onClick={disabled ? undefined : row.onTap}
+                  className="row press"
+                  onClick={row.onTap}
                   style={{
                     width: "100%",
                     borderRight: "none",
@@ -223,7 +186,7 @@ export const Settings = ({
                     borderLeft: "none",
                     background: "transparent",
                     textAlign: "left",
-                    cursor: disabled ? "not-allowed" : "pointer",
+                    cursor: "pointer",
                     ["--press" as string]: 0.99,
                   }}
                 >
@@ -242,21 +205,17 @@ export const Settings = ({
                   >
                     {row.label}
                   </span>
-                  {disabled ? (
-                    <ComingSoon />
-                  ) : (
-                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {row.detail && (
-                        <span
-                          data-theme-text="faint"
-                          style={{ fontSize: 13, fontWeight: 600, color: "var(--kc-faint)" }}
-                        >
-                          {row.detail}
-                        </span>
-                      )}
-                      <ChevronIcon />
-                    </span>
-                  )}
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {row.detail && (
+                      <span
+                        data-theme-text="faint"
+                        style={{ fontSize: 13, fontWeight: 600, color: "var(--kc-faint)" }}
+                      >
+                        {row.detail}
+                      </span>
+                    )}
+                    <ChevronIcon />
+                  </span>
                 </button>
               );
             })}

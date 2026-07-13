@@ -1,24 +1,46 @@
+import { DisabledFeature } from "@app/features/DisabledFeature.tsx";
+import { FeatureReadiness } from "@app/features/FeatureReadiness.tsx";
+import type { CurrentFeatureId } from "@app/features/preferences.ts";
+import {
+  dockFeatureById,
+  dockOwnerForPath,
+  type FeatureId,
+  featureById,
+  featureOwnerForPath,
+} from "@app/features/registry.ts";
+import { useFeatureHost } from "@app/features/useFeatureHost.ts";
+import { isCurrentFeatureId } from "@app/features/useFeaturePreferences.ts";
+import { useToolPreferences } from "@app/features/useToolPreferences.ts";
 import { useWalletRouter, WalletRouterProvider } from "@app/router.tsx";
-import { routeWithoutOverlay } from "@app/routing/index.ts";
+import { formatHashRoute, parseHashRoute, routeWithoutOverlay } from "@app/routing/index.ts";
 import {
   createInitialWalletState,
   decodeWalletBackup,
+  type FeatureStorageNamespace,
   loadWalletState,
   MAX_CARDS,
   MAX_CONTACTS,
+  resetWalletState,
   saveWalletState,
   type Theme,
   type WalletState,
   walletBackup,
+  walletPreferenceInitialization,
+  walletStorageCapacityForChange,
 } from "@app/storage.ts";
 import { Activity } from "@features/activity/Activity.tsx";
-import { createActivity } from "@features/activity/activity.ts";
+import { ActivitySummary } from "@features/activity/ActivitySummary.tsx";
+import { projectActivityFact } from "@features/activity/journal.ts";
 import {
   type BackupSaveResult,
   type BackupSelection,
   BackupSheet,
 } from "@features/backup/BackupSheet.tsx";
-import { createEncryptedBackup, readEncryptedBackup } from "@features/backup/backup.ts";
+import {
+  BackupTooLargeError,
+  createEncryptedBackup,
+  readEncryptedBackup,
+} from "@features/backup/backup.ts";
 import {
   type RestorePreviewResult,
   type RestoreResult,
@@ -34,19 +56,18 @@ import { ContactDetail } from "@features/contacts/ContactDetail.tsx";
 import { Contacts } from "@features/contacts/Contacts.tsx";
 import { type EditContactResult, EditContactSheet } from "@features/contacts/EditContactSheet.tsx";
 import { addVerifiedGithubProof } from "@features/identity/accountVerification.ts";
-import { nostrPublicKey } from "@features/identity/nostrKeys.ts";
 import { ShareSheet } from "@features/profile-sharing/ShareSheet.tsx";
 import {
   encodeSharedProfile,
   type SharedProfile,
   sharedProfileToContact,
 } from "@features/profile-sharing/sharedProfile.ts";
-import { copyText, profileShareUrl } from "@features/profile-sharing/sharing.ts";
+import { profileShareUrl } from "@features/profile-sharing/sharing.ts";
 import { AppearanceSheet } from "@features/settings/AppearanceSheet.tsx";
+import { FeatureLibrary } from "@features/settings/FeatureLibrary.tsx";
 import { HelpSheet } from "@features/settings/HelpSheet.tsx";
 import { ResetSheet } from "@features/settings/ResetSheet.tsx";
 import { Settings } from "@features/settings/Settings.tsx";
-import { Tools } from "@features/tools/Tools.tsx";
 import { Home } from "@features/wallet/Home.tsx";
 import {
   type Card,
@@ -57,15 +78,20 @@ import {
   PROVIDER_META,
   type Proof,
   type ProviderId,
+  removeCards,
   removeContacts,
   removeProof,
   updateCard,
   updateContact,
 } from "@keychain/core";
+import { copyText } from "@shared/lib/clipboard.ts";
 import { FALLBACK_CARD_RECT, FALLBACK_HERO_RECT, type Flip, type Rect } from "@shared/lib/flip.ts";
-import { BottomNav, type NavKey } from "@shared/ui/BottomNav.tsx";
+import { nostrPublicKey } from "@shared/lib/nostrKeys.ts";
+import { BottomNav, type BottomNavItem } from "@shared/ui/BottomNav.tsx";
+import { FeatureBoundary } from "@shared/ui/FeatureBoundary.tsx";
 import { Sheet } from "@shared/ui/Sheet.tsx";
 import {
+  lazy,
   type ReactElement,
   useCallback,
   useEffect,
@@ -73,11 +99,23 @@ import {
   useRef,
   useState,
 } from "react";
+import type { ActivityFact, CapabilityResolver } from "../contracts/capabilities.ts";
+import type { FeatureRuntimeContext } from "../contracts/feature.ts";
+import { isToolOperation, TOOL_FEATURES } from "../contracts/tool-operation.ts";
 
-const withActivity = (
-  state: WalletState,
-  event: ReturnType<typeof createActivity>,
-): WalletState => ({ ...state, activity: [event, ...state.activity].slice(0, 100) });
+const LazyTools = lazy(async () => {
+  const runtime = await featureById("tools").load();
+  return { default: runtime.Tools };
+});
+
+const activationCapabilities: CapabilityResolver = {
+  required: (id) => {
+    throw new Error(`Capability ${id} is not available during feature activation`);
+  },
+  optional: () => null,
+};
+
+const featureRuntimeContext: FeatureRuntimeContext = { capabilities: activationCapabilities };
 
 const shareUrlFor = (subject: Card | Contact): string =>
   profileShareUrl(window.location.href, encodeSharedProfile(subject));
@@ -87,8 +125,16 @@ const backupFilename = (): string =>
 
 const WalletApplication = (): ReactElement => {
   const { route, push, replace, back, closeOverlay } = useWalletRouter();
-  const [loaded] = useState(loadWalletState);
+  const [boot] = useState(() => {
+    // Classify the original document before load performs the idempotent V1 -> split migration.
+    const preferenceInitialization = walletPreferenceInitialization();
+    return { preferenceInitialization, loaded: loadWalletState() };
+  });
+  const { loaded, preferenceInitialization } = boot;
   const [wallet, setWallet] = useState<WalletState>(loaded.state);
+  const [unavailableFeatures, setUnavailableFeatures] = useState<
+    readonly FeatureStorageNamespace[]
+  >(() => (loaded.ok ? (loaded.unavailableFeatures ?? []) : []));
   const [firstCardCreationOpen, setFirstCardCreationOpen] = useState(
     loaded.state.cards.length === 0 &&
       !(route.page === "people" && route.sheet === "add" && route.profile !== undefined),
@@ -96,9 +142,8 @@ const WalletApplication = (): ReactElement => {
   const [contactQuery, setContactQuery] = useState("");
   const [contactManaging, setContactManaging] = useState(false);
   const [contactRemovalOpen, setContactRemovalOpen] = useState(false);
-  const [persistenceEnabled, setPersistenceEnabled] = useState(
-    loaded.ok || loaded.reason !== "unsupported",
-  );
+  const [identityRemovalOpen, setIdentityRemovalOpen] = useState(false);
+  const [persistenceEnabled, setPersistenceEnabled] = useState(loaded.ok);
   const { cards, contacts, activeId, activity, theme } = wallet;
   const active = cards.find((card) => card.id === activeId);
   const detail = route.page === "card" ? cards.find((card) => card.id === route.cardId) : undefined;
@@ -115,9 +160,6 @@ const WalletApplication = (): ReactElement => {
     0,
     cards.findIndex((card) => card.id === selectedCardId),
   );
-  const recentActivity = [...activity]
-    .sort((left, right) => right.occurredAt - left.occurredAt)
-    .slice(0, 3);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
@@ -126,30 +168,94 @@ const WalletApplication = (): ReactElement => {
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 1900);
   }, []);
+  const featureHost = useFeatureHost({
+    initialization: preferenceInitialization,
+    onMessage: showToast,
+    runtimeContext: featureRuntimeContext,
+    unavailableFeatures,
+  });
+  const toolPreferences = useToolPreferences(showToast);
+  const featurePreferences = featureHost.preferences;
+  const normalizedFeaturePreferences = featurePreferences;
+  const peopleEnabled = featureHost.isEnabled("people");
+  const activityEnabled = featureHost.isEnabled("activity");
+  const toolsEnabled = featureHost.isEnabled("tools");
+  const peopleReadiness = featureHost.readiness("people");
+  const activityReadiness = featureHost.readiness("activity");
+  const toolsReadiness = featureHost.readiness("tools");
+  const toolOperationEnabled =
+    route.page !== "tools" || toolPreferences.enabled.includes(route.operation);
+  const peopleOperational = peopleEnabled && peopleReadiness !== "data-unavailable";
+  const activityOperational = activityEnabled && activityReadiness !== "data-unavailable";
+  const activityEnabledRef = useRef(activityOperational);
+  useLayoutEffect(() => {
+    activityEnabledRef.current = activityOperational;
+  }, [activityOperational]);
+  const withActivity = (
+    update: (state: WalletState) => WalletState,
+    fact: ActivityFact,
+  ): ((state: WalletState) => WalletState) => {
+    // React may replay an updater. Capture every observable input at emission so a replay is pure.
+    const eventId = activityEnabledRef.current ? crypto.randomUUID() : null;
+    const projectionContext = eventId === null ? null : { id: (): string => eventId };
+    return (state) => {
+      const next = update(state);
+      return projectionContext === null
+        ? next
+        : {
+            ...next,
+            activity: projectActivityFact(next.activity, fact, projectionContext),
+          };
+    };
+  };
+  const recentActivity = [...activity]
+    .sort((left, right) => right.occurredAt - left.occurredAt)
+    .slice(0, 3);
 
   const storageWarningShown = useRef(false);
   useEffect(() => {
-    if (!loaded.ok && !storageWarningShown.current) {
+    if (storageWarningShown.current) return;
+    if (loaded.ok && (loaded.unavailableFeatures?.length ?? 0) > 0) {
       storageWarningShown.current = true;
-      showToast(
-        loaded.reason === "invalid"
-          ? "Saved data was damaged, so the preview was reset"
-          : loaded.reason === "unsupported"
-            ? "Saved data needs a newer app; changes won’t be saved"
-            : "Changes can’t be saved on this device",
-      );
+      showToast("Some feature data couldn’t be opened; the original data was preserved");
+      return;
     }
+    if (loaded.ok) return;
+    storageWarningShown.current = true;
+    showToast(
+      loaded.reason === "invalid"
+        ? "Saved data was damaged, so the preview was reset"
+        : loaded.reason === "unsupported"
+          ? "Saved data needs a newer app; changes won’t be saved"
+          : "Changes can’t be saved on this device",
+    );
   }, [loaded, showToast]);
 
   useEffect(() => {
     // Never destroy state written by a newer schema when an older app is opened.
     if (!persistenceEnabled) return;
-    const result = saveWalletState(wallet);
-    if (!result.ok && !storageWarningShown.current) {
+    const result = saveWalletState(wallet, localStorage, {
+      preserveFeatures: unavailableFeatures,
+    });
+    if (result.ok) {
+      const nextUnavailable = result.unavailableFeatures ?? [];
+      setUnavailableFeatures((current) =>
+        current.length === nextUnavailable.length &&
+        current.every((feature) => nextUnavailable.includes(feature))
+          ? current
+          : nextUnavailable,
+      );
+      if (nextUnavailable.length > 0 && !storageWarningShown.current) {
+        storageWarningShown.current = true;
+        showToast("Some feature data couldn’t be saved; the original data was preserved");
+      }
+      return;
+    }
+    if (!storageWarningShown.current) {
       storageWarningShown.current = true;
       showToast("Changes can’t be saved on this device");
     }
-  }, [persistenceEnabled, showToast, wallet]);
+  }, [persistenceEnabled, showToast, unavailableFeatures, wallet]);
 
   useEffect(() => {
     const media =
@@ -349,49 +455,128 @@ const WalletApplication = (): ReactElement => {
     });
   }, [clearFlipTimers, flip, relativeRect, route.page]);
 
-  const go = (key: NavKey): void => {
+  const openFeature = (id: CurrentFeatureId): void => {
+    if (id === "tools") {
+      push({ page: "tools", operation: toolPreferences.enabled[0] ?? "encrypt" });
+      return;
+    }
+    const feature = featureById(id);
+    const entryPath =
+      ("dock" in feature ? feature.dock?.entryPath : undefined) ?? feature.routes[0]?.prefix;
+    if (entryPath === undefined) {
+      showToast(`${feature.title} does not have a screen`);
+      return;
+    }
+    push(parseHashRoute(`#${entryPath}`));
+  };
+
+  const go = (id: FeatureId): void => {
     clearFlipTimers();
     setFlip(null);
     detailOrigin.current = null;
     contactOrigin.current = null;
-    switch (key) {
-      case "home":
-        push({ page: "wallet" });
-        break;
-      case "contacts":
-        push({ page: "people" });
-        break;
-      case "tools":
-        push({ page: "tools", operation: "encrypt" });
-        break;
-      case "settings":
-        push({ page: "settings" });
-        break;
-    }
+    push(
+      id === "tools"
+        ? { page: "tools", operation: toolPreferences.enabled[0] ?? "encrypt" }
+        : parseHashRoute(`#${dockFeatureById(id).entryPath}`),
+    );
   };
 
-  const navCurrent: NavKey =
-    route.page === "people" || route.page === "person"
-      ? "contacts"
-      : route.page === "tools"
-        ? "tools"
-        : route.page === "settings"
-          ? "settings"
-          : "home";
+  const canonicalHash = formatHashRoute(route);
+  const queryStart = canonicalHash.indexOf("?");
+  const currentPath = canonicalHash.slice(1, queryStart < 0 ? canonicalHash.length : queryStart);
+  const currentFeatureOwner = featureOwnerForPath(currentPath);
+  const currentRouteEnablement =
+    currentFeatureOwner !== null && isCurrentFeatureId(currentFeatureOwner)
+      ? normalizedFeaturePreferences.enabled.includes(currentFeatureOwner)
+      : true;
+  const currentRouteReadiness =
+    currentFeatureOwner !== null && isCurrentFeatureId(currentFeatureOwner)
+      ? featureHost.readiness(currentFeatureOwner)
+      : "ready";
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (frame === null) return;
+    frame.dataset.route = currentPath;
+    frame.dataset.routeFeatureEnabled = String(currentRouteEnablement);
+    frame.dataset.routeFeatureReadiness = currentRouteReadiness;
+    const updateRouteHeading = (): boolean => {
+      const heading = frame.querySelector<HTMLHeadingElement>("h1");
+      if (heading === null) return false;
+      document.title = `${heading.textContent ?? "Keychain"} · Keychain`;
+      heading.focus({ preventScroll: true });
+      return true;
+    };
+    if (updateRouteHeading()) return;
+    const observer = new MutationObserver(() => {
+      if (updateRouteHeading()) observer.disconnect();
+    });
+    observer.observe(frame, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [currentPath, currentRouteEnablement, currentRouteReadiness]);
+  const dockItems = normalizedFeaturePreferences.dock.map(({ id }) => {
+    const feature = dockFeatureById(id);
+    return {
+      key: feature.id,
+      label: feature.label,
+      icon: feature.icon,
+      href: `#${feature.entryPath}`,
+    } satisfies BottomNavItem<FeatureId>;
+  });
+  const navCurrent = dockOwnerForPath(currentPath);
+
+  const commitWalletChange = (
+    update: (state: WalletState) => WalletState,
+  ): { readonly ok: true } | { readonly ok: false; readonly message: string } => {
+    const next = update(wallet);
+    const capacity = walletStorageCapacityForChange(wallet, next);
+    if (!capacity.ok) {
+      return {
+        ok: false,
+        message:
+          capacity.namespace === "people"
+            ? "This change would exceed local People storage. Remove a large profile image first."
+            : capacity.namespace === "activity"
+              ? "This change would exceed local Activity storage."
+              : capacity.namespace === "aggregate"
+                ? "This change would exceed this device’s safe local storage budget."
+                : "This change would exceed local wallet storage. Remove a large profile image first.",
+      };
+    }
+    if (persistenceEnabled) {
+      const saved = saveWalletState(next, localStorage, {
+        preserveFeatures: unavailableFeatures,
+      });
+      if (!saved.ok) {
+        return { ok: false, message: "This change couldn’t be saved on this device." };
+      }
+      const nextUnavailable = saved.unavailableFeatures ?? [];
+      setUnavailableFeatures((current) =>
+        current.length === nextUnavailable.length &&
+        current.every((feature) => nextUnavailable.includes(feature))
+          ? current
+          : nextUnavailable,
+      );
+    }
+    setWallet(next);
+    return { ok: true };
+  };
 
   const activate = (card: Card): void => {
     if (card.id === activeId) return;
     const previous = active?.name ?? card.name;
-    setWallet((state) =>
-      withActivity(
-        { ...state, activeId: card.id },
-        createActivity(
-          { kind: "emoji", emoji: "🔄", bg: "#EDE7FB" },
-          `Switched to ${card.name}`,
-          `from ${previous}`,
-        ),
-      ),
+    const committed = commitWalletChange(
+      withActivity((state) => ({ ...state, activeId: card.id }), {
+        kind: "identity.activated",
+        name: card.name,
+        previousName: previous,
+        occurredAt: Date.now(),
+      }),
     );
+    if (!committed.ok) {
+      showToast(committed.message);
+      return;
+    }
     if (route.page === "wallet") replace({ page: "wallet", cardId: card.id });
     showToast(`${card.name} is now active`);
   };
@@ -409,20 +594,18 @@ const WalletApplication = (): ReactElement => {
       return false;
     }
     const card = createCard({ id: crypto.randomUUID(), ...input });
-    setWallet((state) =>
-      withActivity(
-        { ...state, cards: [...state.cards, card], activeId: card.id },
-        createActivity(
-          {
-            kind: "emoji",
-            emoji: card.avatar.startsWith("data:image/") ? "🙂" : card.avatar || "🙂",
-            bg: "#E9F7EC",
-          },
-          `Created ${card.name} card`,
-          "A separate profile",
-        ),
-      ),
+    const committed = commitWalletChange(
+      withActivity((state) => ({ ...state, cards: [...state.cards, card], activeId: card.id }), {
+        kind: "identity.created",
+        name: card.name,
+        avatar: card.avatar,
+        occurredAt: Date.now(),
+      }),
     );
+    if (!committed.ok) {
+      showToast(committed.message);
+      return false;
+    }
     showToast("Card created and activated");
     return true;
   };
@@ -440,37 +623,80 @@ const WalletApplication = (): ReactElement => {
       showToast("Give your card a name");
       return;
     }
-    setWallet((state) =>
+    const committed = commitWalletChange(
       withActivity(
-        { ...state, cards: updateCard(state.cards, detail.id, { ...patch, name }) },
-        createActivity(
-          {
-            kind: "emoji",
-            emoji: patch.avatar.startsWith("data:image/") ? "🙂" : patch.avatar || "🙂",
-            bg: "#FCEDE7",
-          },
-          `Updated ${name}`,
-          "Card details changed",
-        ),
+        (state) => ({
+          ...state,
+          cards: updateCard(state.cards, detail.id, { ...patch, name }),
+        }),
+        {
+          kind: "identity.updated",
+          name,
+          avatar: patch.avatar,
+          occurredAt: Date.now(),
+        },
       ),
     );
+    if (!committed.ok) {
+      showToast(committed.message);
+      return;
+    }
     closeOverlay();
     showToast("Changes saved");
   };
 
   const disconnectAccount = (provider: ProviderId): void => {
     if (detail === undefined) return;
-    setWallet((state) =>
+    const committed = commitWalletChange(
       withActivity(
-        { ...state, cards: removeProof(state.cards, detail.id, provider) },
-        createActivity(
-          { kind: "provider", provider },
-          `Disconnected ${PROVIDER_META[provider].name}`,
-          detail.name,
-        ),
+        (state) => ({ ...state, cards: removeProof(state.cards, detail.id, provider) }),
+        {
+          kind: "account.disconnected",
+          provider,
+          identityName: detail.name,
+          occurredAt: Date.now(),
+        },
       ),
     );
+    if (!committed.ok) {
+      showToast(committed.message);
+      return;
+    }
     showToast(`${PROVIDER_META[provider].name} disconnected`);
+  };
+
+  const deleteIdentity = (): void => {
+    if (detail === undefined) return;
+    const deleted = detail;
+    const committed = commitWalletChange(
+      withActivity(
+        (state) => {
+          const remaining = removeCards(state.cards, [deleted.id]);
+          return {
+            ...state,
+            cards: remaining,
+            activeId: state.activeId === deleted.id ? (remaining[0]?.id ?? "") : state.activeId,
+          };
+        },
+        {
+          kind: "identity.deleted",
+          name: deleted.name,
+          avatar: deleted.avatar,
+          occurredAt: Date.now(),
+        },
+      ),
+    );
+    if (!committed.ok) {
+      showToast(committed.message);
+      return;
+    }
+    clearFlipTimers();
+    setFlip(null);
+    detailOrigin.current = null;
+    setIdentityRemovalOpen(false);
+    if (cards.length === 1) setFirstCardCreationOpen(true);
+    replace({ page: "wallet" });
+    showToast(`${deleted.name} deleted`);
   };
 
   const connectAccount = (cardId: string): void => {
@@ -483,12 +709,13 @@ const WalletApplication = (): ReactElement => {
 
   const saveIdentity = (identity: IdentityKeyPair): void => {
     if (connectCard === undefined) return;
-    setWallet((state) => ({
+    const committed = commitWalletChange((state) => ({
       ...state,
       cards: state.cards.map((card) =>
         card.id === connectCard.id && card.identity === undefined ? { ...card, identity } : card,
       ),
     }));
+    if (!committed.ok) showToast(committed.message);
   };
 
   const finishConnectAccount = (account: {
@@ -498,9 +725,9 @@ const WalletApplication = (): ReactElement => {
   }): void => {
     if (connectCard === undefined) return;
     const cardId = connectCard.id;
-    setWallet((state) =>
+    const committed = commitWalletChange(
       withActivity(
-        {
+        (state) => ({
           ...state,
           cards: addVerifiedGithubProof(
             state.cards,
@@ -509,14 +736,20 @@ const WalletApplication = (): ReactElement => {
             account.verificationCode,
             account.identity,
           ),
+        }),
+        {
+          kind: "account.connected",
+          provider: "github",
+          username: account.username,
+          identityName: connectCard.name,
+          occurredAt: Date.now(),
         },
-        createActivity(
-          { kind: "provider", provider: "github" },
-          `Connected ${account.username}`,
-          `${connectCard.name} · GitHub`,
-        ),
       ),
     );
+    if (!committed.ok) {
+      showToast(committed.message);
+      return;
+    }
     closeOverlay();
     showToast("GitHub account connected");
   };
@@ -539,21 +772,15 @@ const WalletApplication = (): ReactElement => {
     ) {
       return { ok: false, message: "This contact is already in your list" };
     }
-    setWallet((state) =>
-      withActivity(
-        { ...state, contacts: [...state.contacts, next] },
-        createActivity(
-          {
-            kind: "emoji",
-            emoji:
-              next.avatar.length > 0 && !next.avatar.startsWith("data:image/") ? next.avatar : "👤",
-            bg: "#E9F7EC",
-          },
-          `Added ${next.name}`,
-          "Saved to contacts",
-        ),
-      ),
+    const committed = commitWalletChange(
+      withActivity((state) => ({ ...state, contacts: [...state.contacts, next] }), {
+        kind: "person.added",
+        name: next.name,
+        avatar: next.avatar,
+        occurredAt: Date.now(),
+      }),
     );
+    if (!committed.ok) return committed;
     replace({ page: "person", contactId: next.id });
     showToast(`${next.name} added`);
     return { ok: true };
@@ -569,16 +796,21 @@ const WalletApplication = (): ReactElement => {
     ) {
       return { ok: false, message: "Another contact already uses this handle" };
     }
-    setWallet((state) =>
+    const committed = commitWalletChange(
       withActivity(
-        { ...state, contacts: updateContact(state.contacts, contact.id, changes) },
-        createActivity(
-          { kind: "emoji", emoji: changes.avatar, bg: "#EDE7FB" },
-          `Updated ${changes.name}`,
-          "Contact details changed",
-        ),
+        (state) => ({
+          ...state,
+          contacts: updateContact(state.contacts, contact.id, changes),
+        }),
+        {
+          kind: "person.updated",
+          name: changes.name,
+          avatar: changes.avatar,
+          occurredAt: Date.now(),
+        },
       ),
     );
+    if (!committed.ok) return committed;
     closeOverlay();
     showToast("Contact updated");
     return { ok: true };
@@ -589,22 +821,22 @@ const WalletApplication = (): ReactElement => {
     if (removing.length === 0) return;
     const firstRemoved = removing[0];
     if (firstRemoved === undefined) return;
-    setWallet((state) =>
+    const committed = commitWalletChange(
       withActivity(
-        { ...state, contacts: removeContacts(state.contacts, contactIds) },
-        createActivity(
-          {
-            kind: "emoji",
-            emoji: removing.length === 1 ? firstRemoved.avatar : "🗑️",
-            bg: "#FDECE7",
-          },
-          removing.length === 1
-            ? `Removed ${firstRemoved.name}`
-            : `Removed ${removing.length} contacts`,
-          "From contacts",
-        ),
+        (state) => ({ ...state, contacts: removeContacts(state.contacts, contactIds) }),
+        {
+          kind: "people.removed",
+          count: removing.length,
+          firstName: firstRemoved.name,
+          firstAvatar: firstRemoved.avatar,
+          occurredAt: Date.now(),
+        },
       ),
     );
+    if (!committed.ok) {
+      showToast(committed.message);
+      return;
+    }
     if (route.page === "person" && contactIds.includes(route.contactId)) {
       replace({ page: "people" });
     }
@@ -636,21 +868,36 @@ const WalletApplication = (): ReactElement => {
     password: string,
     selection: BackupSelection,
   ): Promise<BackupSaveResult> => {
+    if (selection.contacts && unavailableFeatures.includes("people")) {
+      return {
+        ok: false,
+        message: "People data is preserved but unavailable; deselect Contacts to continue",
+      };
+    }
+    if (selection.settings && unavailableFeatures.includes("activity")) {
+      return {
+        ok: false,
+        message: "Activity data is preserved but unavailable; deselect Settings to continue",
+      };
+    }
     try {
       const contents = await createEncryptedBackup(walletBackup(wallet, selection), password);
-      setWallet((state) =>
-        withActivity(
-          state,
-          createActivity(
-            { kind: "emoji", emoji: "🛡️", bg: "#E9F7EC" },
-            "Prepared an encrypted backup",
-            "Ready to download",
-          ),
-        ),
+      const committed = commitWalletChange(
+        withActivity((state) => state, {
+          kind: "backup.prepared",
+          occurredAt: Date.now(),
+        }),
       );
+      if (!committed.ok) showToast(committed.message);
       return { ok: true, contents, filename: backupFilename() };
-    } catch {
-      return { ok: false, message: "The backup could not be created" };
+    } catch (error: unknown) {
+      return {
+        ok: false,
+        message:
+          error instanceof BackupTooLargeError
+            ? "This selection is too large; include fewer items"
+            : "The backup could not be created",
+      };
     }
   };
 
@@ -684,6 +931,12 @@ const WalletApplication = (): ReactElement => {
     password: string,
     selection: BackupSelection,
   ): Promise<RestoreResult> => {
+    if (selection.contacts && unavailableFeatures.includes("people")) {
+      return { ok: false, message: "People data is protected and can’t be replaced" };
+    }
+    if (selection.settings && unavailableFeatures.includes("activity")) {
+      return { ok: false, message: "Activity data is protected and can’t be replaced" };
+    }
     const decrypted = await readEncryptedBackup(contents, password);
     if (!decrypted.ok) return { ok: false, message: "The backup could not be opened again" };
     const decoded = decodeWalletBackup(decrypted.value);
@@ -707,7 +960,7 @@ const WalletApplication = (): ReactElement => {
           ]
         : wallet.contacts;
     const restored = withActivity(
-      {
+      () => ({
         ...wallet,
         cards,
         contacts,
@@ -715,14 +968,10 @@ const WalletApplication = (): ReactElement => {
         ...(decoded.included.settings && selection.settings
           ? { theme: decoded.state.theme, activity: decoded.state.activity }
           : {}),
-      },
-      createActivity(
-        { kind: "emoji", emoji: "📥", bg: "#FFF6DB" },
-        "Restored a local backup",
-        "Selected backup data imported",
-      ),
-    );
-    if (!saveWalletState(restored).ok) {
+      }),
+      { kind: "backup.restored", occurredAt: Date.now() },
+    )(wallet);
+    if (!saveWalletState(restored, localStorage, { preserveFeatures: unavailableFeatures }).ok) {
       return { ok: false, message: "The restored data couldn’t be saved on this device" };
     }
     setPersistenceEnabled(true);
@@ -731,29 +980,39 @@ const WalletApplication = (): ReactElement => {
   };
 
   const changeTheme = (nextTheme: Theme): void => {
-    setWallet((state) => ({ ...state, theme: nextTheme }));
+    const committed = commitWalletChange((state) => ({ ...state, theme: nextTheme }));
+    if (!committed.ok) showToast(committed.message);
   };
 
   const resetApplication = (): void => {
     const reset = createInitialWalletState();
-    if (!saveWalletState(reset).ok) {
+    if (!resetWalletState().ok) {
       showToast("The application couldn’t be reset on this device");
       return;
     }
+    const featurePreferenceReset = featureHost.reset();
+    const toolPreferenceReset = toolPreferences.reset();
     setPersistenceEnabled(true);
+    setUnavailableFeatures([]);
+    storageWarningShown.current = false;
     setWallet(reset);
     setFirstCardCreationOpen(true);
     setContactQuery("");
     setContactManaging(false);
     setContactRemovalOpen(false);
     replace({ page: "settings" });
-    showToast("Application reset");
+    showToast(
+      featurePreferenceReset.persistence.mode === "persistent" && toolPreferenceReset
+        ? "Application reset"
+        : "Application reset, but feature settings couldn’t be saved",
+    );
   };
 
   const overlayOpen =
     routeWithoutOverlay(route) !== null &&
     (route.page !== "card" || detail !== undefined) &&
-    (route.page !== "person" || contact !== undefined);
+    (route.page !== "person" || (peopleOperational && contact !== undefined)) &&
+    (route.page !== "people" || peopleOperational);
   const flipSubject =
     flip?.kind === "contact"
       ? contacts.find((person) => person.id === flip.id)
@@ -811,16 +1070,48 @@ const WalletApplication = (): ReactElement => {
               })
             }
             onConnectAccount={() => connectAccount(active.id)}
-            onSeeActivity={() => push({ page: "activity" })}
             onAccountTap={(account) =>
               showToast(
                 `${account.username} is connected via ${PROVIDER_META[account.provider].name}`,
               )
             }
-            recentActivity={recentActivity}
+            {...(activityOperational
+              ? {
+                  secondary: (
+                    <ActivitySummary
+                      items={recentActivity}
+                      onOpen={() => push({ page: "activity" })}
+                    />
+                  ),
+                }
+              : {})}
           />
         )}
-        {route.page === "people" && (
+        {(route.page === "people" || route.page === "person") &&
+          peopleReadiness === "data-unavailable" && (
+            <FeatureReadiness
+              title="People"
+              status="data-unavailable"
+              {...(peopleEnabled
+                ? {
+                    onDisable: () => {
+                      featureHost.disable("people");
+                      replace({ page: "features" });
+                    },
+                  }
+                : {})}
+            />
+          )}
+        {(route.page === "people" || route.page === "person") &&
+          !peopleEnabled &&
+          peopleReadiness !== "data-unavailable" && (
+            <DisabledFeature
+              title={featureById("people").title}
+              summary={featureById("people").summary}
+              onEnable={() => featureHost.enable("people")}
+            />
+          )}
+        {route.page === "people" && peopleOperational && (
           <Contacts
             contacts={contacts}
             cardEls={contactCardEls}
@@ -833,15 +1124,136 @@ const WalletApplication = (): ReactElement => {
             onRemove={removeContactIds}
           />
         )}
-        {route.page === "activity" && <Activity items={activity} />}
-        {route.page === "tools" && active !== undefined && (
-          <Tools
-            active={active}
-            cards={cards}
-            contacts={contacts}
-            operation={route.operation}
-            onOperation={(operation) => push({ page: "tools", operation })}
-            onToast={showToast}
+        {route.page === "activity" &&
+          (activityReadiness === "data-unavailable" ? (
+            <FeatureReadiness
+              title="Activity"
+              status="data-unavailable"
+              {...(activityEnabled
+                ? {
+                    onDisable: () => {
+                      featureHost.disable("activity");
+                      replace({ page: "features" });
+                    },
+                  }
+                : {})}
+            />
+          ) : !activityEnabled ? (
+            <DisabledFeature
+              title={featureById("activity").title}
+              summary={featureById("activity").summary}
+              onEnable={() => featureHost.enable("activity")}
+            />
+          ) : (
+            <Activity items={activity} />
+          ))}
+        {route.page === "tools" && !toolsEnabled && toolsReadiness !== "update-required" && (
+          <DisabledFeature
+            title={featureById("tools").title}
+            summary={featureById("tools").summary}
+            onEnable={() => featureHost.enable("tools")}
+          />
+        )}
+        {route.page === "tools" &&
+          toolsEnabled &&
+          (toolsReadiness === "idle" || toolsReadiness === "preparing") && (
+            <FeatureReadiness
+              title="Tools"
+              status="preparing"
+              onRetry={() => void featureHost.prepare("tools")}
+              onDisable={() => featureHost.disable("tools")}
+            />
+          )}
+        {route.page === "tools" && toolsEnabled && toolsReadiness === "failed" && (
+          <FeatureReadiness
+            title="Tools"
+            status="failed"
+            onRetry={() => void featureHost.prepare("tools")}
+            onDisable={() => {
+              featureHost.disable("tools");
+              replace({ page: "features" });
+            }}
+          />
+        )}
+        {route.page === "tools" && toolsReadiness === "update-required" && (
+          <FeatureReadiness
+            title="Tools"
+            status="update-required"
+            onReload={() => window.location.reload()}
+            {...(toolsEnabled
+              ? {
+                  onDisable: () => {
+                    featureHost.disable("tools");
+                    replace({ page: "features" });
+                  },
+                }
+              : {})}
+          />
+        )}
+        {route.page === "tools" &&
+          toolsEnabled &&
+          (toolsReadiness === "ready" || toolsReadiness === "online-only") &&
+          !toolOperationEnabled && (
+            <DisabledFeature
+              title={TOOL_FEATURES.find(({ id }) => id === route.operation)?.title ?? "Tool"}
+              summary="This tool is turned off. You can turn it on without changing the other Tools features."
+              onEnable={() => toolPreferences.setEnabled(route.operation, true)}
+            />
+          )}
+        {route.page === "tools" &&
+          toolsEnabled &&
+          toolOperationEnabled &&
+          (toolsReadiness === "ready" || toolsReadiness === "online-only") &&
+          active !== undefined && (
+            <FeatureBoundary
+              feature="Tools"
+              onError={(error) => featureHost.fail("tools", error)}
+              onDisable={() => {
+                featureHost.disable("tools");
+                replace({ page: "features" });
+              }}
+            >
+              <LazyTools
+                active={active}
+                cards={cards}
+                contacts={peopleOperational ? contacts : []}
+                operation={route.operation}
+                enabledOperations={toolPreferences.enabled}
+                onOperation={(operation) => push({ page: "tools", operation })}
+                onToast={showToast}
+              />
+            </FeatureBoundary>
+          )}
+        {route.page === "features" && (
+          <FeatureLibrary
+            items={featureHost.libraryEntries.map((item) =>
+              item.id === "tools"
+                ? {
+                    ...item,
+                    children: TOOL_FEATURES.map((tool) => ({
+                      ...tool,
+                      enabled: toolPreferences.enabled.includes(tool.id),
+                    })),
+                  }
+                : item,
+            )}
+            dockLabels={dockItems.map(({ label }) => label)}
+            onBack={() => back({ page: "settings" })}
+            onEnable={featureHost.enable}
+            onDisable={featureHost.disable}
+            onPin={featureHost.pin}
+            onUnpin={featureHost.unpin}
+            onMove={featureHost.reorder}
+            onOpen={(id) => {
+              if (isCurrentFeatureId(id)) openFeature(id);
+            }}
+            onRetry={featureHost.retry}
+            onReload={() => window.location.reload()}
+            onToggleChild={(parentId, id, enabled) => {
+              if (parentId === "tools" && isToolOperation(id)) {
+                toolPreferences.setEnabled(id, enabled);
+              }
+            }}
           />
         )}
         {route.page === "settings" && active !== undefined && (
@@ -852,12 +1264,12 @@ const WalletApplication = (): ReactElement => {
               detailOrigin.current = "settings";
               push({ page: "card", cardId: activeId });
             }}
+            onFeatures={() => push({ page: "features" })}
             onAppearance={() => push({ page: "settings", sheet: "appearance" })}
             onBackup={() => push({ page: "settings", sheet: "backup" })}
             onRestore={() => push({ page: "settings", sheet: "restore" })}
             onHelp={() => push({ page: "settings", sheet: "help" })}
             onReset={() => push({ page: "settings", sheet: "reset" })}
-            onActivity={() => push({ page: "activity" })}
           />
         )}
         {route.page === "card" && detail !== undefined && (
@@ -874,9 +1286,11 @@ const WalletApplication = (): ReactElement => {
             onCopyPrivateKey={(privateKey) => void copyPrivateKey(privateKey)}
             onDisconnectAccount={disconnectAccount}
             onConnectAccount={() => connectAccount(detail.id)}
+            onDelete={deleteIdentity}
+            onRemovalDialogChange={setIdentityRemovalOpen}
           />
         )}
-        {route.page === "person" && contact !== undefined && (
+        {route.page === "person" && peopleOperational && contact !== undefined && (
           <ContactDetail
             contact={contact}
             profileLink={contactUrl}
@@ -896,7 +1310,8 @@ const WalletApplication = (): ReactElement => {
           active !== undefined &&
           !overlayOpen &&
           !contactManaging &&
-          !contactRemovalOpen && <BottomNav current={navCurrent} onGo={go} />}
+          !contactRemovalOpen &&
+          !identityRemovalOpen && <BottomNav items={dockItems} current={navCurrent} onGo={go} />}
 
         {overlayOpen && (
           <Sheet

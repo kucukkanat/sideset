@@ -1,8 +1,8 @@
-import { CardAvatar } from "@features/cards/CardAvatar.tsx";
 import { type Card, paletteFor } from "@keychain/core";
 import { readAvatarFile } from "@shared/lib/avatar.ts";
 import { Upload } from "lucide-react";
 import { type FormEvent, type ReactElement, useState } from "react";
+import { CardAvatar } from "./CardAvatar.tsx";
 
 export const EditSheet = ({
   card,

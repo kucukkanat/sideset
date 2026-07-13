@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
+  ACTIVITY_STORAGE_KEY,
   createInitialWalletState,
   decodeWalletBackup,
   decodeWalletSnapshot,
   loadWalletState,
+  PEOPLE_STORAGE_KEY,
   saveWalletState,
   WALLET_STORAGE_KEY,
   type WalletState,
@@ -13,8 +15,14 @@ import {
 import { createInitialActivity } from "@features/activity/activity.ts";
 import { SEED_CARDS, SEED_CONTACTS } from "@keychain/core";
 
-beforeEach(() => localStorage.removeItem(WALLET_STORAGE_KEY));
-afterEach(() => localStorage.removeItem(WALLET_STORAGE_KEY));
+const clearWalletStorage = (): void => {
+  localStorage.removeItem(WALLET_STORAGE_KEY);
+  localStorage.removeItem(PEOPLE_STORAGE_KEY);
+  localStorage.removeItem(ACTIVITY_STORAGE_KEY);
+};
+
+beforeEach(clearWalletStorage);
+afterEach(clearWalletStorage);
 
 const seededState = (): WalletState => ({
   ...createInitialWalletState(),
@@ -185,9 +193,23 @@ describe("wallet local storage", () => {
     };
 
     expect(saveWalletState(state)).toEqual({ ok: true });
-    expect(JSON.parse(localStorage.getItem(WALLET_STORAGE_KEY) ?? "null")).toEqual(
-      walletSnapshot(state),
-    );
+    expect(JSON.parse(localStorage.getItem(WALLET_STORAGE_KEY) ?? "null")).toMatchObject({
+      format: "keychain.wallet.core",
+      version: 2,
+      cards: state.cards,
+      activeId: state.activeId,
+      theme: state.theme,
+    });
+    expect(JSON.parse(localStorage.getItem(PEOPLE_STORAGE_KEY) ?? "null")).toMatchObject({
+      version: 1,
+      feature: "people",
+      revisions: [{ contacts: state.contacts }],
+    });
+    expect(JSON.parse(localStorage.getItem(ACTIVITY_STORAGE_KEY) ?? "null")).toMatchObject({
+      version: 1,
+      feature: "activity",
+      revisions: [{ activity: state.activity }],
+    });
     expect(loadWalletState()).toEqual({ ok: true, state });
   });
 

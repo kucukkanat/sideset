@@ -4,10 +4,10 @@ import {
   createGithubVerificationCode,
   generateIdentityKeyPair,
 } from "@features/identity/accountVerification.ts";
-import { nostrPublicKey } from "@features/identity/nostrKeys.ts";
 import {
   decodeSharedProfile,
   encodeSharedProfile,
+  MAX_SHARED_PROFILE_TOKEN_CHARS,
   parseEd25519PublicKey,
   type SharedProfile,
   sharedProfileFromPublicKey,
@@ -16,6 +16,7 @@ import {
   verifySharedProfile,
 } from "@features/profile-sharing/sharedProfile.ts";
 import type { Card } from "@keychain/core";
+import { nostrPublicKey } from "@shared/lib/nostrKeys.ts";
 
 const PROFILE: Pick<
   Card,
@@ -160,6 +161,19 @@ describe("shared profile encoding", () => {
         color: 0,
         bio: "",
       },
+    });
+  });
+
+  test("omits oversized embedded avatars before they can create an unusable link", () => {
+    const encoded = encodeSharedProfile({
+      ...PROFILE,
+      avatar: `data:image/png;base64,${"A".repeat(12_000)}`,
+    });
+
+    expect(encoded.length).toBeLessThanOrEqual(MAX_SHARED_PROFILE_TOKEN_CHARS);
+    expect(decodeSharedProfile(encoded)).toMatchObject({
+      ok: true,
+      profile: { avatar: "", name: "Çağrı 李" },
     });
   });
 });

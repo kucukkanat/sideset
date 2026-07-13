@@ -1,19 +1,6 @@
-import { nostrPublicKey, nostrPublicKeyHex } from "@features/identity/nostrKeys.ts";
-import { copyText } from "@features/profile-sharing/sharing.ts";
-import { CloakTool } from "@features/tools/CloakTool.tsx";
-import type { ToolOperation } from "@features/tools/model.ts";
-import {
-  bytesText,
-  decryptFromRecipient,
-  decryptWithPassphrase,
-  encryptForRecipient,
-  encryptWithPassphrase,
-  type SignedTextVerification,
-  signText,
-  textBytes,
-  verifySignedText,
-} from "@features/tools/tools.ts";
 import type { Card, Contact } from "@keychain/core";
+import { copyText } from "@shared/lib/clipboard.ts";
+import { nostrPublicKey, nostrPublicKeyHex } from "@shared/lib/nostrKeys.ts";
 import { ActionButton } from "@shared/ui/ActionButton.tsx";
 import { ScreenHeader } from "@shared/ui/ScreenHeader.tsx";
 import {
@@ -31,6 +18,20 @@ import {
   XCircle,
 } from "lucide-react";
 import { type ChangeEvent, type ReactElement, useMemo, useState } from "react";
+import type { FeatureRuntime } from "../../contracts/feature.ts";
+import type { ToolOperation } from "../../contracts/tool-operation.ts";
+import { CloakTool } from "./CloakTool.tsx";
+import {
+  bytesText,
+  decryptFromRecipient,
+  decryptWithPassphrase,
+  encryptForRecipient,
+  encryptWithPassphrase,
+  type SignedTextVerification,
+  signText,
+  textBytes,
+  verifySignedText,
+} from "./tools.ts";
 
 const OPERATION_ICONS: Readonly<Record<ToolOperation, LucideIcon>> = {
   encrypt: LockKeyhole,
@@ -39,6 +40,9 @@ const OPERATION_ICONS: Readonly<Record<ToolOperation, LucideIcon>> = {
   verify: BadgeCheck,
   cloak: VenetianMask,
 };
+
+// Tools has no background work yet; the explicit lifecycle keeps that invariant removable.
+export const activate: FeatureRuntime["activate"] = () => () => undefined;
 
 interface RecipientOption {
   readonly id: string;
@@ -97,6 +101,7 @@ export const Tools = ({
   cards,
   contacts,
   operation,
+  enabledOperations,
   onOperation,
   onToast,
 }: {
@@ -104,6 +109,7 @@ export const Tools = ({
   readonly cards: readonly Card[];
   readonly contacts: readonly Contact[];
   readonly operation: ToolOperation;
+  readonly enabledOperations: readonly ToolOperation[];
   readonly onOperation: (operation: ToolOperation) => void;
   readonly onToast: (message: string) => void;
 }): ReactElement => {
@@ -188,27 +194,29 @@ export const Tools = ({
       />
       <div className="app-page-content app-page-stack">
         <div className="tools-segments" role="group" aria-label="Tool operation">
-          {(["encrypt", "decrypt", "sign", "verify", "cloak"] as const).map((item) => {
-            const Icon = OPERATION_ICONS[item];
-            return (
-              <button
-                type="button"
-                data-testid={`tools-operation-${item}`}
-                key={item}
-                onClick={() => {
-                  onOperation(item);
-                  setOutput("");
-                  setVerification(null);
-                  setFile(null);
-                }}
-                className={operation === item ? "tools-segment active" : "tools-segment"}
-                aria-pressed={operation === item}
-              >
-                <Icon aria-hidden="true" size={17} />
-                {item}
-              </button>
-            );
-          })}
+          {(["encrypt", "decrypt", "sign", "verify", "cloak"] as const)
+            .filter((item) => enabledOperations.includes(item))
+            .map((item) => {
+              const Icon = OPERATION_ICONS[item];
+              return (
+                <button
+                  type="button"
+                  data-testid={`tools-operation-${item}`}
+                  key={item}
+                  onClick={() => {
+                    onOperation(item);
+                    setOutput("");
+                    setVerification(null);
+                    setFile(null);
+                  }}
+                  className={operation === item ? "tools-segment active" : "tools-segment"}
+                  aria-pressed={operation === item}
+                >
+                  <Icon aria-hidden="true" size={17} />
+                  {item}
+                </button>
+              );
+            })}
         </div>
         {operation === "cloak" && <CloakTool onToast={onToast} />}
         {(operation === "encrypt" || operation === "decrypt") && (

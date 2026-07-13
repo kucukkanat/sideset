@@ -1,7 +1,7 @@
-import { type ActivityItem, formatActivityTime } from "@features/activity/activity.ts";
 import { PROVIDER_META } from "@keychain/core";
 import { ProviderIcon } from "@shared/ui/icons.tsx";
 import type { ReactElement } from "react";
+import { type ActivityItem, formatActivityTime } from "./activity.ts";
 
 export const ActivityRow = ({ item }: { item: ActivityItem }): ReactElement => (
   <div data-testid={`activity-row-${item.id}`} className="row">

@@ -1,7 +1,7 @@
-import { ActivityRow } from "@features/activity/ActivityRow.tsx";
-import { type ActivityItem, groupActivity } from "@features/activity/activity.ts";
 import { ScreenHeader } from "@shared/ui/ScreenHeader.tsx";
 import type { ReactElement } from "react";
+import { ActivityRow } from "./ActivityRow.tsx";
+import { type ActivityItem, groupActivity } from "./activity.ts";
 
 export const Activity = ({ items }: { items: readonly ActivityItem[] }): ReactElement => {
   const groups = groupActivity(items);

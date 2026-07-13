@@ -1,7 +1,7 @@
 import { verifySignedProof } from "@features/identity/accountVerification.ts";
-import { nostrPublicKey, nostrPublicKeyHex } from "@features/identity/nostrKeys.ts";
 import type { Card, Contact, Proof, ProviderId } from "@keychain/core";
 import { isAvatar } from "@shared/lib/avatar.ts";
+import { nostrPublicKey, nostrPublicKeyHex } from "@shared/lib/nostrKeys.ts";
 
 export interface SharedProfile {
   readonly version: 1;
@@ -55,6 +55,9 @@ const isProvider = (value: unknown): value is ProviderId =>
 
 const isBase64Url = (value: unknown): value is string =>
   typeof value === "string" && /^[A-Za-z0-9_-]+$/u.test(value);
+
+export const MAX_SHARED_PROFILE_TOKEN_CHARS = 12_000;
+const MAX_SHARED_EMBEDDED_AVATAR_CHARS = 4_000;
 
 export const parseEd25519PublicKey = (value: string): string | null => nostrPublicKeyHex(value);
 
@@ -118,26 +121,41 @@ export const encodeSharedProfile = (profile: ShareableProfile): string => {
       username: proof.username,
       ...(proof.verificationCode === undefined ? {} : { verificationCode: proof.verificationCode }),
     }));
-  return toBase64Url(
-    JSON.stringify({
-      version: 1,
-      sourceId: profile.id,
-      ...(identityId && identityId !== publicKey ? { identityId } : {}),
-      ...(publicKey ? { publicKey } : {}),
-      name: profile.name,
-      handle: profile.handle,
-      ...(profile.username ? { username: profile.username } : {}),
-      ...(profile.email ? { email: profile.email } : {}),
-      avatar: profile.avatar,
-      color: profile.color,
-      bio: profile.bio,
-      ...(proofs.length > 0 ? { proofs } : {}),
-    } satisfies SharedProfile),
-  );
+  // Large local images make QR/link payloads unusable. The empty sentinel deterministically
+  // regenerates an avatar for the recipient without leaking megabytes into a URL.
+  const avatar =
+    profile.avatar.startsWith("data:image/") &&
+    profile.avatar.length > MAX_SHARED_EMBEDDED_AVATAR_CHARS
+      ? ""
+      : profile.avatar;
+  const candidate = (includeProofs: boolean): string =>
+    toBase64Url(
+      JSON.stringify({
+        version: 1,
+        sourceId: profile.id,
+        ...(identityId && identityId !== publicKey ? { identityId } : {}),
+        ...(publicKey ? { publicKey } : {}),
+        name: profile.name,
+        handle: profile.handle,
+        ...(profile.username ? { username: profile.username } : {}),
+        ...(profile.email ? { email: profile.email } : {}),
+        avatar,
+        color: profile.color,
+        bio: profile.bio,
+        ...(includeProofs && proofs.length > 0 ? { proofs } : {}),
+      } satisfies SharedProfile),
+    );
+  const complete = candidate(true);
+  if (complete.length <= MAX_SHARED_PROFILE_TOKEN_CHARS) return complete;
+  const withoutProofs = candidate(false);
+  if (withoutProofs.length <= MAX_SHARED_PROFILE_TOKEN_CHARS) return withoutProofs;
+  throw new RangeError("Profile fields exceed the share-link limit");
 };
 
 export const decodeSharedProfile = (encoded: string): SharedProfileResult => {
-  if (encoded.length === 0 || encoded.length > 12_000) return { ok: false, reason: "invalid" };
+  if (encoded.length === 0 || encoded.length > MAX_SHARED_PROFILE_TOKEN_CHARS) {
+    return { ok: false, reason: "invalid" };
+  }
   try {
     const value: unknown = JSON.parse(fromBase64Url(encoded));
     if (!isRecord(value)) return { ok: false, reason: "invalid" };

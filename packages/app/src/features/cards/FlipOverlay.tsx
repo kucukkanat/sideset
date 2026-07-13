@@ -1,9 +1,9 @@
-import { CardAvatar } from "@features/cards/CardAvatar.tsx";
-import { CardFace } from "@features/cards/CardFace.tsx";
 import { type Card, type Contact, paletteFor } from "@keychain/core";
 import { FALLBACK_CARD_RECT, type Flip } from "@shared/lib/flip.ts";
 import { BackIcon, EditIcon } from "@shared/ui/icons.tsx";
 import type { CSSProperties, ReactElement } from "react";
+import { CardAvatar } from "./CardAvatar.tsx";
+import { CardFace } from "./CardFace.tsx";
 
 const isContact = (s: Card | Contact): s is Contact => "mutuals" in s;
 

@@ -1,5 +1,5 @@
-import { generateNostrIdentity } from "@features/identity/nostrKeys.ts";
 import type { Card, IdentityKeyPair, ProviderId } from "@keychain/core";
+import { generateNostrIdentity } from "@shared/lib/nostrKeys.ts";
 import { nip19 } from "nostr-tools";
 import { finalizeEvent, getPublicKey, type NostrEvent, verifyEvent } from "nostr-tools/pure";
 

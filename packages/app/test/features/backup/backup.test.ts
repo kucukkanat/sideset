@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { createEncryptedBackup, readEncryptedBackup } from "@features/backup/backup.ts";
+import {
+  BackupTooLargeError,
+  createEncryptedBackup,
+  MAX_BACKUP_BYTES,
+  MAX_BACKUP_PLAINTEXT_BYTES,
+  readEncryptedBackup,
+} from "@features/backup/backup.ts";
 
 const supportsWebCrypto =
   typeof crypto === "object" &&
@@ -70,9 +76,15 @@ describe("encrypted backups", () => {
   });
 
   test("rejects oversized files before parsing or key derivation", async () => {
-    expect(await readEncryptedBackup(" ".repeat(5_000_001), "password")).toEqual({
+    expect(await readEncryptedBackup(" ".repeat(MAX_BACKUP_BYTES + 1), "password")).toEqual({
       ok: false,
       reason: "invalid-file",
     });
+  });
+
+  test("never creates a backup larger than the reader accepts", async () => {
+    expect(
+      createEncryptedBackup("x".repeat(MAX_BACKUP_PLAINTEXT_BYTES + 1), "password"),
+    ).rejects.toBeInstanceOf(BackupTooLargeError);
   });
 });

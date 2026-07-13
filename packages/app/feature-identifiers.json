@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "featureIds": [
+    { "id": "activity", "status": "active" },
+    { "id": "people", "status": "active" },
+    { "id": "settings", "status": "active" },
+    { "id": "tools", "status": "active" },
+    { "id": "wallet", "status": "active" }
+  ],
+  "routePrefixes": [
+    { "id": "activity", "prefix": "/activity", "owner": "activity", "status": "active" },
+    { "id": "cards", "prefix": "/cards", "owner": "wallet", "status": "active" },
+    { "id": "people", "prefix": "/people", "owner": "people", "status": "active" },
+    { "id": "settings", "prefix": "/settings", "owner": "settings", "status": "active" },
+    { "id": "tools", "prefix": "/tools", "owner": "tools", "status": "active" },
+    { "id": "wallet", "prefix": "/wallet", "owner": "wallet", "status": "active" }
+  ],
+  "capabilityIds": [
+    { "id": "activity.journal", "status": "active" },
+    { "id": "identity.reader", "status": "active" },
+    { "id": "people.recipient-source", "status": "active" }
+  ],
+  "storagePrefixes": [
+    { "id": "wallet-v1", "prefix": "keychain.wallet.v1", "status": "active" },
+    { "id": "preferences-v1", "prefix": "keychain.preferences.v1", "status": "active" },
+    { "id": "activity-v1", "prefix": "keychain.feature.activity.v1", "status": "active" },
+    { "id": "people-v1", "prefix": "keychain.feature.people.v1", "status": "active" }
+  ]
+}

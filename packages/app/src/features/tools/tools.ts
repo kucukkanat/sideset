@@ -1,10 +1,6 @@
-import {
-  generateNostrIdentity,
-  nostrPublicKey,
-  nostrPublicKeyHex,
-} from "@features/identity/nostrKeys.ts";
 import type { Card, IdentityKeyPair } from "@keychain/core";
 import { schnorr } from "@noble/curves/secp256k1.js";
+import { generateNostrIdentity, nostrPublicKey, nostrPublicKeyHex } from "@shared/lib/nostrKeys.ts";
 import { nip44 } from "nostr-tools";
 import { getPublicKey } from "nostr-tools/pure";
 

@@ -1,34 +1,46 @@
 import { NavIcon, type NavIconKind } from "@shared/ui/icons.tsx";
-import type { ReactElement } from "react";
+import type { MouseEvent, ReactElement } from "react";
 
-export type NavKey = "home" | "contacts" | "tools" | "settings";
+export interface BottomNavItem<Key extends string> {
+  readonly key: Key;
+  readonly label: string;
+  readonly icon: NavIconKind;
+  readonly href: `#/${string}`;
+}
 
-const ITEMS: readonly { key: NavKey; label: string; icon: NavIconKind }[] = [
-  { key: "home", label: "Wallet", icon: "wallet" },
-  { key: "contacts", label: "People", icon: "people" },
-  { key: "tools", label: "Tools", icon: "tools" },
-  { key: "settings", label: "Settings", icon: "gear" },
-];
-
-export const BottomNav = ({
+export const BottomNav = <Key extends string>({
+  items,
   current,
   onGo,
 }: {
-  current: NavKey;
-  onGo: (key: NavKey) => void;
+  readonly items: readonly BottomNavItem<Key>[];
+  readonly current: Key | null;
+  readonly onGo: (key: Key) => void;
 }): ReactElement => (
-  <div data-testid="bottom-navigation" className="bottom-nav">
+  <nav data-testid="bottom-navigation" className="bottom-nav" aria-label="Primary">
     <div data-testid="bottom-navigation-inner" className="bottom-nav-inner">
-      {ITEMS.map((item) => {
+      {items.map((item) => {
         const on = current === item.key;
         return (
-          <button
-            type="button"
+          <a
             key={item.key}
+            href={item.href}
             data-testid={`nav-${item.key}`}
             aria-current={on ? "page" : undefined}
             className="bottom-nav-item press"
-            onClick={() => onGo(item.key)}
+            onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+              if (
+                event.button !== 0 ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              ) {
+                return;
+              }
+              event.preventDefault();
+              onGo(item.key);
+            }}
             style={{ ["--press" as string]: 0.88 }}
           >
             <div data-testid={`nav-${item.key}-icon`} className="bottom-nav-icon">
@@ -37,9 +49,9 @@ export const BottomNav = ({
             <div data-testid={`nav-${item.key}-label`} className="bottom-nav-label">
               {item.label}
             </div>
-          </button>
+          </a>
         );
       })}
     </div>
-  </div>
+  </nav>
 );

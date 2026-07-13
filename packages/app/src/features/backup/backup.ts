@@ -1,7 +1,16 @@
 const BACKUP_FORMAT = "keychain-wallet-backup";
 const ITERATIONS = 250_000;
-export const MAX_BACKUP_BYTES = 5_000_000;
+/** Covers the maximum current core + People + Activity payload after AES-GCM/base64 expansion. */
+export const MAX_BACKUP_BYTES = 30_000_000;
+export const MAX_BACKUP_PLAINTEXT_BYTES = 21_000_000;
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
+export class BackupTooLargeError extends Error {
+  constructor() {
+    super("The selected backup data exceeds the supported backup size");
+    this.name = "BackupTooLargeError";
+  }
+}
 
 interface BackupEnvelopeV1 {
   readonly format: typeof BACKUP_FORMAT;
@@ -56,14 +65,17 @@ const deriveKey = async (
 };
 
 export const createEncryptedBackup = async (value: unknown, password: string): Promise<string> => {
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) throw new TypeError("Backup data is not serializable");
+  const plaintext = new TextEncoder().encode(serialized);
+  if (plaintext.byteLength > MAX_BACKUP_PLAINTEXT_BYTES) throw new BackupTooLargeError();
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(password, salt, ITERATIONS);
-  const plaintext = new TextEncoder().encode(JSON.stringify(value));
   const ciphertext = new Uint8Array(
     await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext),
   );
-  return JSON.stringify(
+  const contents = JSON.stringify(
     {
       format: BACKUP_FORMAT,
       version: 1,
@@ -75,6 +87,8 @@ export const createEncryptedBackup = async (value: unknown, password: string): P
     null,
     2,
   );
+  if (contents.length > MAX_BACKUP_BYTES) throw new BackupTooLargeError();
+  return contents;
 };
 
 const parseEnvelope = (
@@ -122,7 +136,12 @@ export const readEncryptedBackup = async (
   contents: string,
   password: string,
 ): Promise<BackupReadResult> => {
-  if (contents.length > MAX_BACKUP_BYTES) return { ok: false, reason: "invalid-file" };
+  if (
+    contents.length > MAX_BACKUP_BYTES ||
+    new TextEncoder().encode(contents).byteLength > MAX_BACKUP_BYTES
+  ) {
+    return { ok: false, reason: "invalid-file" };
+  }
   const parsed = parseEnvelope(contents);
   if (!parsed.ok) return parsed;
   try {

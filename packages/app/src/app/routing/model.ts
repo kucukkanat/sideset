@@ -1,4 +1,4 @@
-import type { ToolOperation } from "@features/tools/model.ts";
+import type { ToolOperation } from "../../contracts/tool-operation.ts";
 
 export type WalletSheet = "create" | "connect";
 export type CardSheet = "edit" | "share" | "connect";
@@ -13,6 +13,7 @@ export type Route =
   | { readonly page: "person"; readonly contactId: string; readonly sheet?: PersonSheet }
   | { readonly page: "activity" }
   | { readonly page: "tools"; readonly operation: ToolOperation }
+  | { readonly page: "features" }
   | { readonly page: "settings"; readonly sheet?: SettingsSheet };
 
 export const DEFAULT_ROUTE: Route = { page: "wallet" };

@@ -48,6 +48,15 @@ export const removeProof = (
     c.id === cardId ? { ...c, proofs: (c.proofs ?? []).filter((p) => p.provider !== provider) } : c,
   );
 
+export const removeCards = (
+  cards: readonly Card[],
+  cardIds: readonly string[],
+): readonly Card[] => {
+  if (cardIds.length === 0) return cards;
+  const removed = new Set(cardIds);
+  return cards.filter((card) => !removed.has(card.id));
+};
+
 export const updateCard = (
   cards: readonly Card[],
   cardId: string,

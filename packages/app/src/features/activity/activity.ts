@@ -17,6 +17,8 @@ export interface ActivityGroup {
   readonly items: readonly ActivityItem[];
 }
 
+export const MAX_ACTIVITY_ITEMS = 100;
+
 const provider = (
   id: string,
   p: ProviderId,
@@ -67,13 +69,6 @@ export const createInitialActivity = (now = Date.now()): readonly ActivityItem[]
     now - 3 * 24 * 60 * 60_000,
   ),
 ];
-
-export const createActivity = (
-  icon: ActivityIcon,
-  title: string,
-  sub: string,
-  occurredAt = Date.now(),
-): ActivityItem => ({ id: crypto.randomUUID(), icon, title, sub, occurredAt });
 
 const startOfDay = (timestamp: number): number => {
   const date = new Date(timestamp);

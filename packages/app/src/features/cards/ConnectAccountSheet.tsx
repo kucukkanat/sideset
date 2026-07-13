@@ -5,7 +5,6 @@ import {
   isGithubUsername,
   verifyGithubProfile,
 } from "@features/identity/accountVerification.ts";
-import { copyText } from "@features/profile-sharing/sharing.ts";
 import {
   type Card,
   type IdentityKeyPair,
@@ -13,6 +12,7 @@ import {
   PROVIDER_META,
   type ProviderId,
 } from "@keychain/core";
+import { copyText } from "@shared/lib/clipboard.ts";
 import { ComingSoon } from "@shared/ui/ComingSoon.tsx";
 import { CheckIcon, CopyIcon, ProviderIcon } from "@shared/ui/icons.tsx";
 import { type FormEvent, type ReactElement, useState } from "react";

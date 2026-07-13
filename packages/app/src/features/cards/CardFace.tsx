@@ -1,7 +1,7 @@
-import { CardAvatar } from "@features/cards/CardAvatar.tsx";
 import { type Card, paletteFor, proofsSummary } from "@keychain/core";
 import { PersonIcon } from "@shared/ui/icons.tsx";
 import type { CSSProperties, ReactElement } from "react";
+import { CardAvatar } from "./CardAvatar.tsx";
 
 interface CardFaceProps {
   readonly card: Card;

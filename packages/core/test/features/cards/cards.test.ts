@@ -4,6 +4,7 @@ import {
   createCard,
   PALETTES,
   paletteFor,
+  removeCards,
   removeProof,
   SEED_CARDS,
   SEED_CONTACTS,
@@ -58,6 +59,16 @@ describe("addProof / removeProof", () => {
     const c1 = next.find((c) => c.id === "c1");
     expect(c1?.proofs?.some((p) => p.provider === "twitter")).toBe(false);
     expect(c1?.proofs?.some((p) => p.provider === "github")).toBe(true);
+  });
+});
+
+describe("removeCards", () => {
+  test("removes a deduplicated set of cards without mutating the source", () => {
+    expect(removeCards(SEED_CARDS, [])).toBe(SEED_CARDS);
+    expect(removeCards(SEED_CARDS, ["c1", "c3", "c1", "missing"]).map(({ id }) => id)).toEqual([
+      "c2",
+    ]);
+    expect(SEED_CARDS).toHaveLength(3);
   });
 });
 

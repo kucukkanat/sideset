@@ -1,11 +1,4 @@
-import { copyText } from "@features/profile-sharing/sharing.ts";
-import {
-  hideWithCloak,
-  MAX_CLOAK_COVER_LENGTH,
-  MAX_CLOAK_SECRET_LENGTH,
-  MAX_CLOAKED_MESSAGE_LENGTH,
-  revealWithCloak,
-} from "@features/tools/cloak.ts";
+import { copyText } from "@shared/lib/clipboard.ts";
 import {
   Copy,
   Eye,
@@ -17,6 +10,13 @@ import {
   VenetianMask,
 } from "lucide-react";
 import { type ReactElement, useState } from "react";
+import {
+  hideWithCloak,
+  MAX_CLOAK_COVER_LENGTH,
+  MAX_CLOAK_SECRET_LENGTH,
+  MAX_CLOAKED_MESSAGE_LENGTH,
+  revealWithCloak,
+} from "./cloak.ts";
 
 type CloakMode = "hide" | "reveal";
 

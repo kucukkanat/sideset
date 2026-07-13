@@ -10,7 +10,9 @@ interface ScreenHeaderProps {
 export const ScreenHeader = ({ title, subtitle, actions }: ScreenHeaderProps): ReactElement => (
   <header className="app-screen-header">
     <div className="app-screen-header-copy">
-      <h1 className="hdr-title">{title}</h1>
+      <h1 className="hdr-title" tabIndex={-1}>
+        {title}
+      </h1>
       {subtitle !== undefined && <p className="hdr-sub">{subtitle}</p>}
     </div>
     {actions !== undefined && <HeaderActions>{actions}</HeaderActions>}
